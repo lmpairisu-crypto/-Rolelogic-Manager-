@@ -118,6 +118,33 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
+// ===============================
+// TikTok URL Verification Files
+// ===============================
+
+// TERMS verification
+const TERMS_TIKTOK_FILE =
+  "tiktokOs88Y6sSiiBXxoK1cKgbxynXxc29xU2P.txt";
+
+const TERMS_TIKTOK_SIGNATURE =
+  "tiktok-developers-site-verification=Os88Y6SiiBXxoK1cKgbxynXxc29xU2P";
+
+app.get(`/terms/${TERMS_TIKTOK_FILE}`, (req, res) => {
+  res.type("text/plain").send(TERMS_TIKTOK_SIGNATURE);
+});
+
+
+// WEB/DESKTOP verification
+const WEB_TIKTOK_FILE =
+  "tiktokh7EKT36y8LsbQvlOpD4KvUIlqwg6EE5E.txt";
+
+const WEB_TIKTOK_SIGNATURE =
+  "tiktok-developers-site-verification=tiktokh7EKT36y8LsbQvlOpD4KvUIlqwg6EE5E";
+
+app.get(`/${WEB_TIKTOK_FILE}`, (req, res) => {
+  res.type("text/plain").send(WEB_TIKTOK_SIGNATURE);
+});
+
 // ============================================================
 // TIKTOK URL VERIFICATION
 // ============================================================
