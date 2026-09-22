@@ -29,7 +29,8 @@ const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
 const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
 
 const BASE_URL =
-  (process.env.BASE_URL || "https://rolelogic-manager.onrender.com")
+  (process.env.BASE_URL ||
+    "https://rolelogic-manager.onrender.com")
     .replace(/\/+$/, "");
 
 const SESSION_SECRET =
@@ -37,7 +38,8 @@ const SESSION_SECRET =
   crypto.randomBytes(32).toString("hex");
 
 const GUILD_ID =
-  process.env.GUILD_ID || "1512880537734480022";
+  process.env.GUILD_ID ||
+  "1512880537734480022";
 
 const TIKTOK_ROLE_ID =
   process.env.TIKTOK_ROLE_ID || "";
@@ -73,20 +75,78 @@ const MIN_VIDEOS = 15;
 
 const app = express();
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(
+  express.urlencoded({
+    extended: true
+  })
+);
+
+app.use(
+  express.json()
+);
 
 /* =========================================================
-   TIKTOK WEBSITE VERIFICATION
+   PUBLIC DIRECTORIES
 ========================================================= */
 
+const PUBLIC_DIR =
+  path.join(
+    __dirname,
+    "public"
+  );
+
+const TERMS_DIR =
+  path.join(
+    PUBLIC_DIR,
+    "terms"
+  );
+
+fs.mkdirSync(
+  PUBLIC_DIR,
+  {
+    recursive: true
+  }
+);
+
+fs.mkdirSync(
+  TERMS_DIR,
+  {
+    recursive: true
+  }
+);
+
+/* =========================================================
+   TIKTOK WEBSITE / DESKTOP VERIFICATION
+========================================================= */
+
+const WEB_VERIFICATION_FILE =
+  "tiktokJsGyH3hw08hb5kMsZe79fh7AxdiF6w9d.txt";
+
+const WEB_VERIFICATION_SIGNATURE =
+  "tiktok-developers-site-verification=JsGyH3hw08hb5kMsZe79fh7AxdiF6w9d";
+
+/*
+   Create Web/Desktop verification file
+*/
+fs.writeFileSync(
+  path.join(
+    PUBLIC_DIR,
+    WEB_VERIFICATION_FILE
+  ),
+  WEB_VERIFICATION_SIGNATURE,
+  "utf8"
+);
+
+/*
+   Direct Web/Desktop verification route
+*/
 app.get(
-  "/tiktokJsGyH3hw08hb5kMsZe79fh7AxdiF6w9d.txt",
+  `/${WEB_VERIFICATION_FILE}`,
   (req, res) => {
     res
       .type("text/plain")
       .send(
-        "tiktok-developers-site-verification=JsGyH3hw08hb5kMsZe79fh7AxdiF6w9d"
+        WEB_VERIFICATION_SIGNATURE
       );
   }
 );
@@ -95,31 +155,56 @@ app.get(
    TIKTOK TERMS VERIFICATION
 ========================================================= */
 
-app.get(
-  "/tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt.txt",
-  (req, res) => {
-    res
-      .type("text/plain")
-      .send(
-        "tiktok-developers-site-verification=jOdbOv8G4myXvw08FoWjzJU80NxBaHSt"
-      );
-  }
+const TERMS_VERIFICATION_FILE =
+  "tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt (1).txt";
+
+const TERMS_VERIFICATION_SIGNATURE =
+  "tiktok-developers-site-verification=jOdbOv8G4myXvw08FoWjzJU80NxBaHSt";
+
+/*
+   Create Terms verification file
+   inside /public/terms/
+*/
+fs.writeFileSync(
+  path.join(
+    TERMS_DIR,
+    TERMS_VERIFICATION_FILE
+  ),
+  TERMS_VERIFICATION_SIGNATURE,
+  "utf8"
 );
 
-/* =========================================================
-   PUBLIC / STATIC FILES
-========================================================= */
-
-const PUBLIC_DIR =
-  path.join(__dirname, "public");
-
-fs.mkdirSync(
-  PUBLIC_DIR,
-  { recursive: true }
+/*
+   Also create a copy at /public/
+   in case TikTok checks the domain root.
+*/
+fs.writeFileSync(
+  path.join(
+    PUBLIC_DIR,
+    TERMS_VERIFICATION_FILE
+  ),
+  TERMS_VERIFICATION_SIGNATURE,
+  "utf8"
 );
 
+/*
+   Serve the Terms verification directory
+   at /terms/
+*/
 app.use(
-  express.static(PUBLIC_DIR)
+  "/terms",
+  express.static(
+    TERMS_DIR
+  )
+);
+
+/*
+   Serve public files
+*/
+app.use(
+  express.static(
+    PUBLIC_DIR
+  )
 );
 
 /* =========================================================
@@ -127,7 +212,10 @@ app.use(
 ========================================================= */
 
 const DATA_DIR =
-  path.join(__dirname, "data");
+  path.join(
+    __dirname,
+    "data"
+  );
 
 const CONNECTIONS_FILE =
   path.join(
@@ -137,7 +225,9 @@ const CONNECTIONS_FILE =
 
 fs.mkdirSync(
   DATA_DIR,
-  { recursive: true }
+  {
+    recursive: true
+  }
 );
 
 function loadConnections() {
@@ -156,6 +246,7 @@ function loadConnections() {
         "utf8"
       )
     );
+
   } catch (error) {
     console.error(
       "Failed to load TikTok connections:",
@@ -166,7 +257,9 @@ function loadConnections() {
   }
 }
 
-function saveConnections(data) {
+function saveConnections(
+  data
+) {
   fs.writeFileSync(
     CONNECTIONS_FILE,
     JSON.stringify(
@@ -185,48 +278,89 @@ const connections =
    HELPERS
 ========================================================= */
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function escapeHtml(
+  value
+) {
+  return String(
+    value ?? ""
+  )
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
 }
 
-function normalize(value) {
-  return String(value ?? "")
+function normalize(
+  value
+) {
+  return String(
+    value ?? ""
+  )
     .trim()
     .toLowerCase();
 }
 
-function containsLMP(value) {
-  return normalize(value)
-    .includes("lmp");
+function containsLMP(
+  value
+) {
+  return normalize(
+    value
+  ).includes("lmp");
 }
 
-function validBio(bio) {
+function validBio(
+  bio
+) {
   const text =
     normalize(bio);
 
   return (
-    text.includes("lmp members") ||
-    text.includes("lampoon creator")
+    text.includes(
+      "lmp members"
+    ) ||
+    text.includes(
+      "lampoon creator"
+    )
   );
 }
 
-function numberValue(value) {
+function numberValue(
+  value
+) {
   const number =
     Number(value);
 
-  return Number.isFinite(number)
+  return Number.isFinite(
+    number
+  )
     ? number
     : 0;
 }
 
-function formatNumber(value) {
-  return numberValue(value)
-    .toLocaleString("en-US");
+function formatNumber(
+  value
+) {
+  return numberValue(
+    value
+  ).toLocaleString(
+    "en-US"
+  );
 }
 
 function formatDate(
@@ -259,7 +393,9 @@ function formatTime(
    TIKTOK ELIGIBILITY
 ========================================================= */
 
-function checkTikTokRequirements(user) {
+function checkTikTokRequirements(
+  user
+) {
   const username =
     user.username ||
     user.display_name ||
@@ -295,23 +431,33 @@ function checkTikTokRequirements(user) {
 
   return {
     username:
-      containsLMP(username) ||
-      containsLMP(displayName),
+      containsLMP(
+        username
+      ) ||
+      containsLMP(
+        displayName
+      ),
 
     bio:
-      validBio(bio),
+      validBio(
+        bio
+      ),
 
     followers:
-      followers >= MIN_FOLLOWERS,
+      followers >=
+      MIN_FOLLOWERS,
 
     following:
-      following >= MIN_FOLLOWING,
+      following >=
+      MIN_FOLLOWING,
 
     likes:
-      likes >= MIN_LIKES,
+      likes >=
+      MIN_LIKES,
 
     videos:
-      videos >= MIN_VIDEOS,
+      videos >=
+      MIN_VIDEOS,
 
     values: {
       username,
@@ -325,7 +471,9 @@ function checkTikTokRequirements(user) {
   };
 }
 
-function isEligible(user) {
+function isEligible(
+  user
+) {
   const requirements =
     checkTikTokRequirements(
       user
@@ -345,7 +493,9 @@ function isEligible(user) {
    OAUTH STATE
 ========================================================= */
 
-function createOAuthState(userId) {
+function createOAuthState(
+  userId
+) {
   const timestamp =
     Date.now();
 
@@ -358,21 +508,31 @@ function createOAuthState(userId) {
         "sha256",
         SESSION_SECRET
       )
-      .update(payload)
-      .digest("hex");
+      .update(
+        payload
+      )
+      .digest(
+        "hex"
+      );
 
   return Buffer.from(
     `${payload}:${signature}`
-  ).toString("base64url");
+  ).toString(
+    "base64url"
+  );
 }
 
-function verifyOAuthState(state) {
+function verifyOAuthState(
+  state
+) {
   try {
     const decoded =
       Buffer.from(
         state,
         "base64url"
-      ).toString("utf8");
+      ).toString(
+        "utf8"
+      );
 
     const parts =
       decoded.split(":");
@@ -387,7 +547,9 @@ function verifyOAuthState(state) {
       parts[0];
 
     const timestamp =
-      Number(parts[1]);
+      Number(
+        parts[1]
+      );
 
     const receivedSignature =
       parts[2];
@@ -406,7 +568,8 @@ function verifyOAuthState(state) {
 
     if (
       age < 0 ||
-      age > 10 * 60 * 1000
+      age >
+        10 * 60 * 1000
     ) {
       return null;
     }
@@ -420,8 +583,12 @@ function verifyOAuthState(state) {
           "sha256",
           SESSION_SECRET
         )
-        .update(payload)
-        .digest("hex");
+        .update(
+          payload
+        )
+        .digest(
+          "hex"
+        );
 
     const receivedBuffer =
       Buffer.from(
@@ -450,6 +617,7 @@ function verifyOAuthState(state) {
     }
 
     return userId;
+
   } catch (error) {
     console.error(
       "OAuth state verification error:",
@@ -481,6 +649,7 @@ async function getGuild() {
     return await client.guilds.fetch(
       GUILD_ID
     );
+
   } catch (error) {
     console.error(
       "Unable to fetch guild:",
@@ -491,7 +660,9 @@ async function getGuild() {
   }
 }
 
-async function getMember(userId) {
+async function getMember(
+  userId
+) {
   try {
     const guild =
       await getGuild();
@@ -503,6 +674,7 @@ async function getMember(userId) {
     return await guild.members.fetch(
       userId
     );
+
   } catch (error) {
     console.error(
       `Unable to fetch member ${userId}:`,
@@ -513,7 +685,9 @@ async function getMember(userId) {
   }
 }
 
-async function getRole(roleId) {
+async function getRole(
+  roleId
+) {
   try {
     if (!roleId) {
       return null;
@@ -529,6 +703,7 @@ async function getRole(roleId) {
     return await guild.roles.fetch(
       roleId
     );
+
   } catch (error) {
     console.error(
       `Unable to fetch role ${roleId}:`,
@@ -539,7 +714,9 @@ async function getRole(roleId) {
   }
 }
 
-function canManageRole(role) {
+function canManageRole(
+  role
+) {
   if (!role) {
     return false;
   }
@@ -555,7 +732,9 @@ async function applyEligibilityRoles(
   userId
 ) {
   const member =
-    await getMember(userId);
+    await getMember(
+      userId
+    );
 
   if (!member) {
     return {
@@ -570,6 +749,10 @@ async function applyEligibilityRoles(
   const addedRoles = [];
   const removedRoles = [];
 
+  /* -------------------------------------------------------
+     LAMPOON ROLE
+  ------------------------------------------------------- */
+
   if (
     LAMPOON_ROLE_ID &&
     !member.roles.cache.has(
@@ -583,7 +766,9 @@ async function applyEligibilityRoles(
 
     if (
       role &&
-      canManageRole(role)
+      canManageRole(
+        role
+      )
     ) {
       try {
         await member.roles.add(
@@ -591,19 +776,27 @@ async function applyEligibilityRoles(
           "TikTok eligibility verification"
         );
 
-        addedRoles.push(role);
+        addedRoles.push(
+          role
+        );
+
       } catch (error) {
         console.error(
           "Failed to add Lampoon role:",
           error
         );
       }
+
     } else {
       console.error(
         "Lampoon role cannot be managed. Check bot role hierarchy."
       );
     }
   }
+
+  /* -------------------------------------------------------
+     CONTENT CREATOR ROLE
+  ------------------------------------------------------- */
 
   if (
     CONTENT_CREATOR_ROLE_ID &&
@@ -618,7 +811,9 @@ async function applyEligibilityRoles(
 
     if (
       role &&
-      canManageRole(role)
+      canManageRole(
+        role
+      )
     ) {
       try {
         await member.roles.add(
@@ -626,19 +821,27 @@ async function applyEligibilityRoles(
           "TikTok eligibility verification"
         );
 
-        addedRoles.push(role);
+        addedRoles.push(
+          role
+        );
+
       } catch (error) {
         console.error(
           "Failed to add Content Creator role:",
           error
         );
       }
+
     } else {
       console.error(
         "Content Creator role cannot be managed."
       );
     }
   }
+
+  /* -------------------------------------------------------
+     REMOVE FOLLOWERS ROLE
+  ------------------------------------------------------- */
 
   if (
     FOLLOWERS_ROLE_ID &&
@@ -653,7 +856,9 @@ async function applyEligibilityRoles(
 
     if (
       role &&
-      canManageRole(role)
+      canManageRole(
+        role
+      )
     ) {
       try {
         await member.roles.remove(
@@ -661,13 +866,17 @@ async function applyEligibilityRoles(
           "TikTok eligibility verification"
         );
 
-        removedRoles.push(role);
+        removedRoles.push(
+          role
+        );
+
       } catch (error) {
         console.error(
           "Failed to remove Followers role:",
           error
         );
       }
+
     } else {
       console.error(
         "Followers role cannot be managed."
@@ -970,16 +1179,11 @@ async function sendEligibilityLog({
         tiktokUser.follower_count
       );
 
-    const avatarUrl =
-      tiktokUser.avatar_url ||
-      member.user.displayAvatarURL({
-        extension: "png",
-        size: 512
-      });
-
     const embed =
       new EmbedBuilder()
-        .setColor("#C48D21")
+        .setColor(
+          "#C48D21"
+        )
         .setDescription(
 `<a:Avisala:1542448826265243660> **Avisala, ${member}!**
 
@@ -1053,8 +1257,12 @@ Check out <#${LMP_TAG_CHANNEL_ID}> to request your nickname with the LMP tag.
       );
 
     await channel.send({
-      embeds: [embed],
-      files: [attachment]
+      embeds: [
+        embed
+      ],
+      files: [
+        attachment
+      ]
     });
 
     setTimeout(
@@ -1219,7 +1427,9 @@ Privacy Policy
 app.get(
   "/health",
   (req, res) => {
-    res.status(200).send("OK");
+    res.status(200).send(
+      "OK"
+    );
   }
 );
 
@@ -1230,7 +1440,9 @@ app.get(
 app.get(
   "/terms",
   (req, res) => {
-    res.redirect("/terms/");
+    res.redirect(
+      "/terms/"
+    );
   }
 );
 
@@ -1408,7 +1620,9 @@ LAMPOON server administration.
 app.get(
   "/privacy",
   (req, res) => {
-    res.redirect("/privacy/");
+    res.redirect(
+      "/privacy/"
+    );
   }
 );
 
@@ -1569,7 +1783,8 @@ app.get(
     try {
       const userId =
         String(
-          req.query.user_id || ""
+          req.query.user_id ||
+          ""
         );
 
       if (!userId) {
@@ -2007,7 +2222,8 @@ profile information.
 
         if (
           roleResult.success &&
-          roleResult.addedRoles.length > 0
+          roleResult.addedRoles.length >
+            0
         ) {
           await sendEligibilityLog({
             userId,
@@ -2109,7 +2325,8 @@ ${requirements.videos ? "✅" : "❌"}
       const roleMessage =
         eligible
           ? (
-              roleResult.addedRoles.length > 0
+              roleResult.addedRoles.length >
+              0
                 ? "Your Discord roles have been updated."
                 : "You are eligible. Your required Discord roles are already assigned."
             )
@@ -2297,14 +2514,18 @@ Please return to Discord and try again.
 
 const tiktokCommand =
   new SlashCommandBuilder()
-    .setName("tiktok")
+    .setName(
+      "tiktok"
+    )
     .setDescription(
       "Connect your TikTok account for LAMPOON verification."
     );
 
 const tiktokStatusCommand =
   new SlashCommandBuilder()
-    .setName("tiktokstatus")
+    .setName(
+      "tiktokstatus"
+    )
     .setDescription(
       "View your TikTok verification status."
     );
@@ -2799,11 +3020,11 @@ app.listen(
     );
 
     console.log(
-      `🔎 TikTok website verification: ${BASE_URL}/tiktokJsGyH3hw08hb5kMsZe79fh7AxdiF6w9d.txt`
+      `🔎 TikTok website verification: ${BASE_URL}/${WEB_VERIFICATION_FILE}`
     );
 
     console.log(
-      `🔎 TikTok terms verification: ${BASE_URL}/tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt.txt`
+      `🔎 TikTok terms verification: ${BASE_URL}/terms/${encodeURIComponent(TERMS_VERIFICATION_FILE)}`
     );
   }
 );
@@ -2816,18 +3037,23 @@ if (!DISCORD_TOKEN) {
   console.error(
     "❌ DISCORD_TOKEN is missing."
   );
+
 } else {
   client
-    .login(DISCORD_TOKEN)
+    .login(
+      DISCORD_TOKEN
+    )
     .then(() => {
       console.log(
         "Discord login requested successfully."
       );
     })
-    .catch(error => {
-      console.error(
-        "❌ Discord login failed:",
-        error
-      );
-    });
-}
+    .catch(
+      error => {
+        console.error(
+          "❌ Discord login failed:",
+          error
+        );
+      }
+    );
+    }
