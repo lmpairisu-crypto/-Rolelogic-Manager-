@@ -52,21 +52,47 @@ const MIN_FOLLOWING = 50;
 const MIN_LIKES = 1000;
 const MIN_VIDEOS = 15;
 
-// ======================================================
-// TIKTOK URL VERIFICATION
-// ======================================================
+// ===============================
+// TIKTOK URL VERIFICATION FILES
+// ===============================
 
-const TERMS_TIKTOK_FILE =
+const PUBLIC_DIR = path.join(__dirname, "public");
+const TERMS_DIR = path.join(PUBLIC_DIR, "terms");
+
+fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+fs.mkdirSync(TERMS_DIR, { recursive: true });
+
+// TERMS verification
+const TERMS_FILE =
   "tiktok9IiFeykTYArFq6Memo5EBMkFcKR7zZjQ.txt";
 
-const TERMS_TIKTOK_SIGNATURE =
+const TERMS_SIGNATURE =
   "tiktok-developers-site-verification=9IiFeykTYArFq6Memo5EBMkFcKR7zZjQ";
 
-const WEB_TIKTOK_FILE =
+fs.writeFileSync(
+  path.join(TERMS_DIR, TERMS_FILE),
+  TERMS_SIGNATURE,
+  "utf8"
+);
+
+// WEB/DESKTOP verification
+const WEB_FILE =
   "tiktokd2DgssM9DaqXnfoxgQ5SPpq2oyzLs2ED.txt";
 
-const WEB_TIKTOK_SIGNATURE =
+const WEB_SIGNATURE =
   "tiktok-developers-site-verification=d2DgssM9DaqXnfoxgQ5SPpq2oyzLs2ED";
+
+// IMPORTANT:
+// This file is directly inside /public/
+// so it is available at the root URL prefix.
+fs.writeFileSync(
+  path.join(PUBLIC_DIR, WEB_FILE),
+  WEB_SIGNATURE,
+  "utf8"
+);
+
+// Serve verification files as real static files
+app.use(express.static(PUBLIC_DIR));
 
 // ======================================================
 // EXPRESS
