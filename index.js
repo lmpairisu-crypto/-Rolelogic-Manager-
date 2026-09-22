@@ -1552,7 +1552,7 @@ const statusCommand =
 // DISCORD READY
 // ============================================================
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log("");
   console.log("==============================================");
   console.log("🤖 LAMPOON ROLE MANAGER ONLINE");
