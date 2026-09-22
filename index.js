@@ -3048,27 +3048,40 @@ app.listen(
    DISCORD LOGIN
 ========================================================= */
 
+console.log("🔄 Starting Discord login...");
+console.log(
+  "🔑 DISCORD_TOKEN configured:",
+  Boolean(DISCORD_TOKEN)
+);
+console.log(
+  "🆔 DISCORD_CLIENT_ID:",
+  DISCORD_CLIENT_ID || "MISSING"
+);
+console.log(
+  "🏠 GUILD_ID:",
+  GUILD_ID
+);
+
 if (!DISCORD_TOKEN) {
   console.error(
-    "❌ DISCORD_TOKEN is missing."
+    "❌ DISCORD_TOKEN is missing from Render Environment."
+  );
+} else {
+  console.log(
+    "🔐 Sending login request to Discord..."
   );
 
-} else {
   client
-    .login(
-      DISCORD_TOKEN
-    )
+    .login(DISCORD_TOKEN)
     .then(() => {
       console.log(
-        "Discord login requested successfully."
+        "✅ Discord login requested successfully."
       );
     })
-    .catch(
-      error => {
-        console.error(
-          "❌ Discord login failed:",
-          error
-        );
-      }
-    );
-    }
+    .catch(error => {
+      console.error(
+        "❌ Discord login failed:"
+      );
+      console.error(error);
+    });
+}
