@@ -1841,7 +1841,7 @@ const tiktokStatusCommand =
    DISCORD READY
 ========================================================= */
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(
     `Discord bot online as ${client.user.tag}`
   );
@@ -1871,11 +1871,20 @@ client.once("ready", async () => {
     );
   }
 
-  /* ---------------------------------------------
+    /* ---------------------------------------------
      ROLE HIERARCHY CHECK
   --------------------------------------------- */
 
   try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+
+    if (!guild) {
+      console.error(
+        `❌ Guild ${GUILD_ID} could not be found.`
+      );
+      return;
+    }
+
     const roles = [
       {
         name: "TikTok",
@@ -1904,8 +1913,7 @@ client.once("ready", async () => {
         continue;
       }
 
-      const role =
-        await guild.roles.fetch(item.id);
+      const role = await guild.roles.fetch(item.id);
 
       if (!role) {
         console.log(
@@ -1919,14 +1927,14 @@ client.once("ready", async () => {
         `${item.name}: ${role.name} (${role.id}) editable=${role.editable}`
       );
     }
+
   } catch (error) {
     console.error(
       "Role hierarchy check failed:",
       error
     );
   }
-});
-
+  
 /* =========================================================
    SLASH COMMAND INTERACTIONS
 ========================================================= */
