@@ -119,15 +119,58 @@ app.get("/health", (req, res) => {
 });
 
 // ============================================================
+// TIKTOK URL VERIFICATION
+// ============================================================
+
+// TikTok verification files
+// These are public verification tokens, not secrets.
+
+const TIKTOK_VERIFICATION_FILES = {
+  "tiktokbj3ABlE0bo4EngihO6xbS5kmh1AFP9q0.txt":
+    "tiktok-developers-site-verification=bj3ABlE0bo4EngihO6xbS5kmh1AFP9q0",
+
+  "tiktoksm2JttwMhNwKjG543zxZAcuRNmofVPh8.txt":
+    "tiktok-developers-site-verification=sm2JttwMhNwKjG543zxZAcuRNmofVPh8",
+
+  "tiktokxB7T5U5R4XXJEFPBRTRhKL9EiozH3gm5.txt":
+    "tiktok-developers-site-verification=xB7T5U5R4XXJEFPBRTRhKL9EiozH3gm5"
+};
+
+// Serve every verification file at the root,
+// /privacy/, and /terms/ URL prefixes.
+//
+// This allows TikTok to verify whichever file it
+// assigned to each URL property.
+
+for (const [filename, verificationText] of Object.entries(
+  TIKTOK_VERIFICATION_FILES
+)) {
+  const locations = [
+    `/${filename}`,
+    `/privacy/${filename}`,
+    `/terms/${filename}`
+  ];
+
+  for (const route of locations) {
+    app.get(route, (req, res) => {
+      res
+        .status(200)
+        .type("text/plain")
+        .send(verificationText);
+    });
+  }
+}
+
+// ============================================================
 // TERMS / PRIVACY
 // ============================================================
 
-app.get("/terms", (req, res) => {
-  res.type("html").send(`
+const termsPage = `
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LAMPOON Role Manager - Terms</title>
 </head>
 <body>
@@ -155,16 +198,15 @@ LAMPOON Role Manager may change or discontinue the service at any time.
 
 </body>
 </html>
-`);
-});
+`;
 
-app.get("/privacy", (req, res) => {
-  res.type("html").send(`
+const privacyPage = `
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>LAMPOON Role Manager - Privacy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LAMPOON Role Manager - Privacy Policy</title>
 </head>
 <body>
 <h1>LAMPOON Role Manager - Privacy Policy</h1>
@@ -196,7 +238,23 @@ connection through the server administrator.
 
 </body>
 </html>
-`);
+`;
+
+// Support BOTH versions with and without trailing slash.
+app.get("/terms", (req, res) => {
+  res.status(200).type("html").send(termsPage);
+});
+
+app.get("/terms/", (req, res) => {
+  res.status(200).type("html").send(termsPage);
+});
+
+app.get("/privacy", (req, res) => {
+  res.status(200).type("html").send(privacyPage);
+});
+
+app.get("/privacy/", (req, res) => {
+  res.status(200).type("html").send(privacyPage);
 });
 
 // ============================================================
