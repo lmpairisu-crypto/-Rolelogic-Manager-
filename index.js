@@ -119,29 +119,29 @@ app.get("/health", (req, res) => {
 });
 
 // ===============================
-// TikTok URL Verification Files
+// TikTok URL Verification
 // ===============================
 
-// TERMS verification
+// TERMS
 const TERMS_TIKTOK_FILE =
-  "tiktokOs88Y6sSiiBXxoK1cKgbxynXxc29xU2P.txt";
+  "tiktok9IiFeykTYArFq6Memo5EBMkFcKR7zZjQ";
 
 const TERMS_TIKTOK_SIGNATURE =
-  "tiktok-developers-site-verification=Os88Y6SiiBXxoK1cKgbxynXxc29xU2P";
+  "tiktok-developers-site-verification=9IiFeykTYArFq6Memo5EBMkFcKR7zZjQ";
 
-app.get(`/terms/${TERMS_TIKTOK_FILE}`, (req, res) => {
+app.get(`/terms/${TERMS_TIKTOK_FILE}.txt`, (req, res) => {
   res.type("text/plain").send(TERMS_TIKTOK_SIGNATURE);
 });
 
 
-// WEB/DESKTOP verification
+// WEB / DESKTOP
 const WEB_TIKTOK_FILE =
-  "tiktokh7EKT36y8LsbQvlOpD4KvUIlqwg6EE5E.txt";
+  "tiktokd2DgssM9DaqXnfoxgQ5SPpq2oyzLs2ED";
 
 const WEB_TIKTOK_SIGNATURE =
-  "tiktok-developers-site-verification=tiktokh7EKT36y8LsbQvlOpD4KvUIlqwg6EE5E";
+  "tiktok-developers-site-verification=d2DgssM9DaqXnfoxgQ5SPpq2oyzLs2ED";
 
-app.get(`/${WEB_TIKTOK_FILE}`, (req, res) => {
+app.get(`/${WEB_TIKTOK_FILE}.txt`, (req, res) => {
   res.type("text/plain").send(WEB_TIKTOK_SIGNATURE);
 });
 
