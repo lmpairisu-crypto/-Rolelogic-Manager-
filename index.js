@@ -150,16 +150,20 @@ app.get(
       );
   }
 );
-
 /* =========================================================
    TIKTOK TERMS VERIFICATION
 ========================================================= */
 
 const TERMS_VERIFICATION_FILE =
-  "tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt (1).txt";
+  "tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt.txt";
 
 const TERMS_VERIFICATION_SIGNATURE =
   "tiktok-developers-site-verification=jOdbOv8G4myXvw08FoWjzJU80NxBaHSt";
+
+/*
+   Create Terms verification directory
+*/
+fs.mkdirSync(TERMS_DIR, { recursive: true });
 
 /*
    Create Terms verification file
@@ -188,23 +192,34 @@ fs.writeFileSync(
 );
 
 /*
-   Serve the Terms verification directory
-   at /terms/
+   IMPORTANT:
+   TikTok is verifying the /terms/ property,
+   so this exact URL must work:
+
+   /terms/tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt.txt
+*/
+app.get(
+  `/terms/${TERMS_VERIFICATION_FILE}`,
+  (req, res) => {
+    res
+      .type("text/plain")
+      .send(TERMS_VERIFICATION_SIGNATURE);
+  }
+);
+
+/*
+   Serve Terms files
 */
 app.use(
   "/terms",
-  express.static(
-    TERMS_DIR
-  )
+  express.static(TERMS_DIR)
 );
 
 /*
    Serve public files
 */
 app.use(
-  express.static(
-    PUBLIC_DIR
-  )
+  express.static(PUBLIC_DIR)
 );
 
 /* =========================================================
