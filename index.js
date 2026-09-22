@@ -51,10 +51,9 @@ const MIN_FOLLOWERS = 300;
 const MIN_FOLLOWING = 50;
 const MIN_LIKES = 1000;
 const MIN_VIDEOS = 15;
-
-// ===============================
-// TIKTOK URL VERIFICATION FILES
-// ===============================
+// ============================================================
+// TIKTOK URL VERIFICATION
+// ============================================================
 
 const PUBLIC_DIR = path.join(__dirname, "public");
 const TERMS_DIR = path.join(PUBLIC_DIR, "terms");
@@ -62,7 +61,10 @@ const TERMS_DIR = path.join(PUBLIC_DIR, "terms");
 fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 fs.mkdirSync(TERMS_DIR, { recursive: true });
 
-// TERMS verification
+// -----------------------------
+// TERMS URL VERIFICATION
+// -----------------------------
+
 const TERMS_FILE =
   "tiktok9IiFeykTYArFq6Memo5EBMkFcKR7zZjQ.txt";
 
@@ -75,7 +77,10 @@ fs.writeFileSync(
   "utf8"
 );
 
-// WEB/DESKTOP verification
+// -----------------------------
+// WEB / DESKTOP URL VERIFICATION
+// -----------------------------
+
 const WEB_FILE =
   "tiktokd2DgssM9DaqXnfoxgQ5SPpq2oyzLs2ED.txt";
 
@@ -84,14 +89,17 @@ const WEB_SIGNATURE =
 
 // IMPORTANT:
 // This file is directly inside /public/
-// so it is available at the root URL prefix.
+// Therefore it is served from:
+//
+// https://rolelogic-manager.onrender.com/tiktokd2DgssM9DaqXnfoxgQ5SPpq2oyzLs2ED.txt
+
 fs.writeFileSync(
   path.join(PUBLIC_DIR, WEB_FILE),
   WEB_SIGNATURE,
   "utf8"
 );
 
-// Serve verification files as real static files
+// Serve public files
 app.use(express.static(PUBLIC_DIR));
 
 // ======================================================
