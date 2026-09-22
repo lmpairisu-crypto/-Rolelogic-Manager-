@@ -2272,4 +2272,4 @@ if (!DISCORD_TOKEN) {
         error
       );
     });
-                                                   }
+  }
