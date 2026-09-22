@@ -656,6 +656,45 @@ const client =
   });
 
 /* =========================================================
+   DISCORD GATEWAY DIAGNOSTICS
+========================================================= */
+
+client.on("debug", message => {
+  console.log("🔎 Discord Debug:", message);
+});
+
+client.on("warn", message => {
+  console.warn("⚠️ Discord Warning:", message);
+});
+
+client.on("error", error => {
+  console.error("❌ Discord Client Error:", error);
+});
+
+client.on("shardError", error => {
+  console.error("❌ Discord Shard Error:", error);
+});
+
+client.on("shardDisconnect", (event, shardId) => {
+  console.error(
+    `🔌 Discord Shard ${shardId} disconnected:`,
+    event
+  );
+});
+
+client.on("shardReconnecting", shardId => {
+  console.log(
+    `🔄 Discord Shard ${shardId} reconnecting...`
+  );
+});
+
+client.on("shardReady", shardId => {
+  console.log(
+    `🟢 Discord Shard ${shardId} is ready.`
+  );
+});
+
+/* =========================================================
    DISCORD HELPERS
 ========================================================= */
 
@@ -3071,14 +3110,27 @@ if (!DISCORD_TOKEN) {
     "🔐 Sending login request to Discord..."
   );
 
+  const loginTimeout = setTimeout(() => {
+    console.error(
+      "⏰ Discord login has not completed after 30 seconds."
+    );
+    console.error(
+      "⚠️ The bot is not reaching the Discord READY event."
+    );
+  }, 30000);
+
   client
     .login(DISCORD_TOKEN)
     .then(() => {
+      clearTimeout(loginTimeout);
+
       console.log(
         "✅ Discord login requested successfully."
       );
     })
     .catch(error => {
+      clearTimeout(loginTimeout);
+
       console.error(
         "❌ Discord login failed:"
       );
