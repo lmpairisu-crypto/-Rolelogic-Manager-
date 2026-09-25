@@ -4,6 +4,7 @@ const express = require("express");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const sharp = require("sharp");
 
 const {
   Client,
@@ -13,12 +14,14 @@ const {
   ButtonBuilder,
   ButtonStyle,
   SlashCommandBuilder,
-  AttachmentBuilder
+  AttachmentBuilder,
 } = require("discord.js");
 
-/* =========================================================
-   CONFIGURATION
-========================================================= */
+// ======================================================
+// CONFIG
+// ======================================================
+
+const app = express();
 
 const PORT = Number(process.env.PORT) || 10000;
 
@@ -29,13 +32,11 @@ const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
 const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
 
 const BASE_URL =
-  (process.env.BASE_URL ||
-    "https://rolelogic-manager.onrender.com")
-    .replace(/\/+$/, "");
+  process.env.BASE_URL ||
+  "https://rolelogic-manager.onrender.com";
 
 const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  crypto.randomBytes(32).toString("hex");
+  process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 
 const GUILD_ID =
   process.env.GUILD_ID ||
@@ -45,970 +46,933 @@ const TIKTOK_ROLE_ID =
   process.env.TIKTOK_ROLE_ID || "";
 
 const LAMPOON_ROLE_ID =
-  process.env.LAMPOON_ROLE_ID || "";
+  process.env.LAMPOON_ROLE_ID ||
+  "1537896539618545795";
 
 const CONTENT_CREATOR_ROLE_ID =
-  process.env.CONTENT_CREATOR_ROLE_ID || "";
+  process.env.CONTENT_CREATOR_ROLE_ID ||
+  "";
 
 const FOLLOWERS_ROLE_ID =
-  process.env.FOLLOWERS_ROLE_ID || "";
+  process.env.FOLLOWERS_ROLE_ID ||
+  "";
 
 const LOG_CHANNEL_ID =
-  process.env.LOG_CHANNEL_ID || "";
+  process.env.LOG_CHANNEL_ID ||
+  "";
+
+const TIKTOK_LEADERBOARD_CHANNEL_ID =
+  process.env.TIKTOK_LEADERBOARD_CHANNEL_ID ||
+  LOG_CHANNEL_ID;
 
 const LMP_TAG_CHANNEL_ID =
   process.env.LMP_TAG_CHANNEL_ID ||
   "1539643480714903602";
 
-/* =========================================================
-   TIKTOK REQUIREMENTS
-========================================================= */
+// ======================================================
+// TIKTOK EMOJI
+// ======================================================
 
-const MIN_FOLLOWERS = 300;
-const MIN_FOLLOWING = 50;
-const MIN_LIKES = 1000;
-const MIN_VIDEOS = 15;
+const TIKTOK_EMOJI =
+  "<:tiktok:1343657442881568778>";
 
-/* =========================================================
-   EXPRESS
-========================================================= */
+// ======================================================
+// TIKTOK REQUIREMENTS
+// ======================================================
 
-const app = express();
+const REQUIREMENTS = {
+  minFollowers: 300,
+  minFollowing: 50,
+  minLikes: 1000,
+  minVideos: 15,
+};
 
-app.use(
-  express.urlencoded({
-    extended: true
-  })
-);
+// ======================================================
+// DIRECTORIES
+// ======================================================
 
-app.use(
-  express.json()
-);
+const DATA_DIR = path.join(__dirname, "data");
 
-/* =========================================================
-   PUBLIC DIRECTORIES
-========================================================= */
-
-const PUBLIC_DIR =
-  path.join(
-    __dirname,
-    "public"
-  );
-
-const TERMS_DIR =
-  path.join(
-    PUBLIC_DIR,
-    "terms"
-  );
-
-fs.mkdirSync(
-  PUBLIC_DIR,
-  {
-    recursive: true
-  }
-);
-
-fs.mkdirSync(
-  TERMS_DIR,
-  {
-    recursive: true
-  }
-);
-
-/* =========================================================
-   TIKTOK WEBSITE / DESKTOP VERIFICATION
-========================================================= */
-
-const WEB_VERIFICATION_FILE =
-  "tiktokJsGyH3hw08hb5kMsZe79fh7AxdiF6w9d.txt";
-
-const WEB_VERIFICATION_SIGNATURE =
-  "tiktok-developers-site-verification=JsGyH3hw08hb5kMsZe79fh7AxdiF6w9d";
-
-/*
-   Create Web/Desktop verification file
-*/
-fs.writeFileSync(
-  path.join(
-    PUBLIC_DIR,
-    WEB_VERIFICATION_FILE
-  ),
-  WEB_VERIFICATION_SIGNATURE,
-  "utf8"
-);
-
-/*
-   Direct Web/Desktop verification route
-*/
-app.get(
-  `/${WEB_VERIFICATION_FILE}`,
-  (req, res) => {
-    res
-      .type("text/plain")
-      .send(
-        WEB_VERIFICATION_SIGNATURE
-      );
-  }
-);
-/* =========================================================
-   TIKTOK TERMS VERIFICATION
-========================================================= */
-
-const TERMS_VERIFICATION_FILE =
-  "tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt.txt";
-
-const TERMS_VERIFICATION_SIGNATURE =
-  "tiktok-developers-site-verification=jOdbOv8G4myXvw08FoWjzJU80NxBaHSt";
-
-/*
-   Create Terms verification directory
-*/
-fs.mkdirSync(TERMS_DIR, { recursive: true });
-
-/*
-   Create Terms verification file
-   inside /public/terms/
-*/
-fs.writeFileSync(
-  path.join(
-    TERMS_DIR,
-    TERMS_VERIFICATION_FILE
-  ),
-  TERMS_VERIFICATION_SIGNATURE,
-  "utf8"
-);
-
-/*
-   Also create a copy at /public/
-   in case TikTok checks the domain root.
-*/
-fs.writeFileSync(
-  path.join(
-    PUBLIC_DIR,
-    TERMS_VERIFICATION_FILE
-  ),
-  TERMS_VERIFICATION_SIGNATURE,
-  "utf8"
-);
-
-/*
-   IMPORTANT:
-   TikTok is verifying the /terms/ property,
-   so this exact URL must work:
-
-   /terms/tiktokjOdbOv8G4myXvw08FoWjzJU80NxBaHSt.txt
-*/
-app.get(
-  `/terms/${TERMS_VERIFICATION_FILE}`,
-  (req, res) => {
-    res
-      .type("text/plain")
-      .send(TERMS_VERIFICATION_SIGNATURE);
-  }
-);
-
-/*
-   Serve Terms files
-*/
-app.use(
-  "/terms",
-  express.static(TERMS_DIR)
-);
-
-/*
-   Serve public files
-*/
-app.use(
-  express.static(PUBLIC_DIR)
-);
-
-/* =========================================================
-   DATA STORAGE
-========================================================= */
-
-const DATA_DIR =
-  path.join(
-    __dirname,
-    "data"
-  );
-
-const CONNECTIONS_FILE =
-  path.join(
-    DATA_DIR,
-    "tiktok-connections.json"
-  );
-
-fs.mkdirSync(
+const CHARACTER_DIR = path.join(
   DATA_DIR,
-  {
-    recursive: true
-  }
+  "growth-characters"
 );
 
-function loadConnections() {
+fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(CHARACTER_DIR, { recursive: true });
+
+// ======================================================
+// DATA FILES
+// ======================================================
+
+const CONNECTIONS_FILE = path.join(
+  DATA_DIR,
+  "tiktok-connections.json"
+);
+
+const SNAPSHOTS_FILE = path.join(
+  DATA_DIR,
+  "tiktok-snapshots.json"
+);
+
+const MILESTONES_FILE = path.join(
+  DATA_DIR,
+  "growth-milestones.json"
+);
+
+// ======================================================
+// JSON HELPERS
+// ======================================================
+
+function loadJSON(file, fallback) {
   try {
-    if (
-      !fs.existsSync(
-        CONNECTIONS_FILE
-      )
-    ) {
-      return {};
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(
+        file,
+        JSON.stringify(fallback, null, 2)
+      );
+
+      return fallback;
     }
 
     return JSON.parse(
-      fs.readFileSync(
-        CONNECTIONS_FILE,
-        "utf8"
-      )
+      fs.readFileSync(file, "utf8")
     );
-
   } catch (error) {
     console.error(
-      "Failed to load TikTok connections:",
+      `Failed loading ${file}:`,
       error
     );
 
-    return {};
+    return fallback;
   }
 }
 
-function saveConnections(
-  data
-) {
-  fs.writeFileSync(
-    CONNECTIONS_FILE,
-    JSON.stringify(
-      data,
-      null,
-      2
-    ),
-    "utf8"
-  );
-}
-
-const connections =
-  loadConnections();
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function escapeHtml(
-  value
-) {
-  return String(
-    value ?? ""
-  )
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
+function saveJSON(file, data) {
+  try {
+    fs.writeFileSync(
+      file,
+      JSON.stringify(data, null, 2)
     );
+  } catch (error) {
+    console.error(
+      `Failed saving ${file}:`,
+      error
+    );
+  }
 }
 
-function normalize(
-  value
-) {
-  return String(
-    value ?? ""
-  )
-    .trim()
-    .toLowerCase();
+let connections = loadJSON(
+  CONNECTIONS_FILE,
+  {}
+);
+
+let snapshots = loadJSON(
+  SNAPSHOTS_FILE,
+  []
+);
+
+let milestones = loadJSON(
+  MILESTONES_FILE,
+  {}
+);
+
+// ======================================================
+// DISCORD CLIENT
+// ======================================================
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+  ],
+});
+
+// ======================================================
+// VERIFICATION SESSION STORAGE
+// ======================================================
+
+const oauthStates = new Map();
+
+// ======================================================
+// UTILITY FUNCTIONS
+// ======================================================
+
+function escapeHTML(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
-function containsLMP(
-  value
-) {
-  return normalize(
-    value
-  ).includes("lmp");
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString("en-US");
 }
 
-function validBio(
-  bio
-) {
-  const text =
-    normalize(bio);
+function getTikTokURL(username) {
+  if (!username) return null;
 
-  return (
-    text.includes(
-      "lmp members"
-    ) ||
-    text.includes(
-      "lampoon creator"
-    )
+  return `https://www.tiktok.com/@${encodeURIComponent(
+    username.replace(/^@/, "")
+  )}`;
+}
+
+function getNextMilestone(followers) {
+  const count = Number(followers || 0);
+
+  if (count < 1000) {
+    return 1000;
+  }
+
+  if (count < 10000) {
+    return Math.ceil(count / 1000) * 1000;
+  }
+
+  return Math.ceil(count / 10000) * 10000;
+}
+
+function getCurrentMilestone(followers) {
+  const count = Number(followers || 0);
+
+  if (count < 1000) {
+    return 0;
+  }
+
+  if (count < 10000) {
+    return Math.floor(count / 1000) * 1000;
+  }
+
+  return Math.floor(count / 10000) * 10000;
+}
+
+function getWeekKey(date = new Date()) {
+  const d = new Date(date);
+
+  const year = d.getUTCFullYear();
+
+  const firstDay = new Date(
+    Date.UTC(year, 0, 1)
   );
+
+  const dayOfYear =
+    Math.floor(
+      (d - firstDay) / 86400000
+    ) + 1;
+
+  const week =
+    Math.ceil(dayOfYear / 7);
+
+  return `${year}-W${String(week).padStart(
+    2,
+    "0"
+  )}`;
 }
 
-function numberValue(
-  value
-) {
-  const number =
-    Number(value);
-
-  return Number.isFinite(
-    number
-  )
-    ? number
-    : 0;
+function randomItem(array) {
+  return array[
+    Math.floor(Math.random() * array.length)
+  ];
 }
 
-function formatNumber(
-  value
-) {
-  return numberValue(
-    value
-  ).toLocaleString(
-    "en-US"
-  );
-}
+// ======================================================
+// MANIFESTATION / GROWTH QUOTES
+// ======================================================
 
-function formatDate(
-  date = new Date()
-) {
-  return date.toLocaleDateString(
-    "en-US",
-    {
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    }
-  );
-}
+const GROWTH_QUOTES = [
+  "What you consistently build will eventually become what you're known for.",
+  "Your growth is proof that your consistency is working.",
+  "Keep showing up. The next milestone is already waiting for you.",
+  "Small progress becomes big results when you refuse to stop.",
+  "What you manifest, you must also move toward.",
+  "Every follower represents someone who chose to follow your journey.",
+  "Your next level begins with the consistency you show today.",
+  "Keep creating. Keep growing. Keep becoming.",
+  "The audience grows when the vision stays consistent.",
+  "One milestone at a time, you're building something bigger.",
+];
 
-function formatTime(
-  date = new Date()
-) {
-  return date.toLocaleTimeString(
-    "en-US",
-    {
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit"
-    }
-  );
-}
+// ======================================================
+// TIKTOK ELIGIBILITY
+// ======================================================
 
-/* =========================================================
-   TIKTOK ELIGIBILITY
-========================================================= */
-
-function checkTikTokRequirements(
-  user
-) {
+function checkEligibility(profile) {
   const username =
-    user.username ||
-    user.display_name ||
-    "";
+    profile.username || "";
 
   const displayName =
-    user.display_name ||
-    "";
+    profile.display_name || "";
 
   const bio =
-    user.bio_description ||
-    "";
+    profile.bio_description || "";
 
-  const followers =
-    numberValue(
-      user.follower_count
-    );
+  const combined =
+    `${username} ${displayName}`.toLowerCase();
 
-  const following =
-    numberValue(
-      user.following_count
-    );
+  const bioLower =
+    bio.toLowerCase();
 
-  const likes =
-    numberValue(
-      user.likes_count
-    );
-
-  const videos =
-    numberValue(
-      user.video_count
-    );
-
-  return {
-    username:
-      containsLMP(
-        username
-      ) ||
-      containsLMP(
-        displayName
-      ),
+  const checks = {
+    name:
+      combined.includes("lmp"),
 
     bio:
-      validBio(
-        bio
+      bioLower.includes("lmp members") ||
+      bioLower.includes("lampoon creator"),
+
+    followers:
+      Number(profile.follower_count || 0) >=
+      REQUIREMENTS.minFollowers,
+
+    following:
+      Number(profile.following_count || 0) >=
+      REQUIREMENTS.minFollowing,
+
+    likes:
+      Number(profile.likes_count || 0) >=
+      REQUIREMENTS.minLikes,
+
+    videos:
+      Number(profile.video_count || 0) >=
+      REQUIREMENTS.minVideos,
+  };
+
+  const eligible =
+    Object.values(checks).every(Boolean);
+
+  return {
+    eligible,
+    checks,
+  };
+}
+
+// ======================================================
+// FIND CONNECTION
+// ======================================================
+
+function getConnection(userId) {
+  return connections[userId] || null;
+}
+
+// ======================================================
+// SAVE CONNECTION
+// ======================================================
+
+function saveConnection(userId, data) {
+  connections[userId] = {
+    ...(connections[userId] || {}),
+    ...data,
+  };
+
+  saveJSON(
+    CONNECTIONS_FILE,
+    connections
+  );
+}
+
+// ======================================================
+// TOKEN REFRESH
+// ======================================================
+
+async function refreshTikTokToken(connection) {
+  if (!connection?.refresh_token) {
+    return connection;
+  }
+
+  try {
+    const body =
+      new URLSearchParams();
+
+    body.append(
+      "client_key",
+      TIKTOK_CLIENT_KEY
+    );
+
+    body.append(
+      "client_secret",
+      TIKTOK_CLIENT_SECRET
+    );
+
+    body.append(
+      "grant_type",
+      "refresh_token"
+    );
+
+    body.append(
+      "refresh_token",
+      connection.refresh_token
+    );
+
+    const response =
+      await fetch(
+        "https://open.tiktokapis.com/v2/oauth/token/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded",
+          },
+          body,
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      console.error(
+        "TikTok token refresh failed:",
+        data
+      );
+
+      return connection;
+    }
+
+    connection.access_token =
+      data.access_token ||
+      connection.access_token;
+
+    connection.refresh_token =
+      data.refresh_token ||
+      connection.refresh_token;
+
+    connection.expires_in =
+      data.expires_in ||
+      connection.expires_in;
+
+    connection.token_updated_at =
+      new Date().toISOString();
+
+    return connection;
+  } catch (error) {
+    console.error(
+      "TikTok token refresh error:",
+      error
+    );
+
+    return connection;
+  }
+}
+
+// ======================================================
+// GET TIKTOK PROFILE
+// ======================================================
+
+async function getTikTokProfile(connection) {
+  if (!connection?.access_token) {
+    return null;
+  }
+
+  try {
+    const fields = [
+      "open_id",
+      "union_id",
+      "avatar_url",
+      "display_name",
+      "username",
+      "bio_description",
+      "follower_count",
+      "following_count",
+      "likes_count",
+      "video_count",
+    ].join(",");
+
+    const response =
+      await fetch(
+        `https://open.tiktokapis.com/v2/user/info/?fields=${fields}`,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${connection.access_token}`,
+          },
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      console.error(
+        "TikTok profile request failed:",
+        data
+      );
+
+      return null;
+    }
+
+    return data.data?.user || null;
+  } catch (error) {
+    console.error(
+      "TikTok profile error:",
+      error
+    );
+
+    return null;
+  }
+}
+
+// ======================================================
+// UPDATE CONNECTION STATS
+// ======================================================
+
+async function updateConnectionStats(userId) {
+  let connection =
+    getConnection(userId);
+
+  if (!connection) {
+    return null;
+  }
+
+  connection =
+    await refreshTikTokToken(
+      connection
+    );
+
+  const profile =
+    await getTikTokProfile(
+      connection
+    );
+
+  if (!profile) {
+    return connection;
+  }
+
+  const profileUrl =
+    getTikTokURL(
+      profile.username
+    );
+
+  const eligibility =
+    checkEligibility(profile);
+
+  saveConnection(userId, {
+    open_id:
+      profile.open_id,
+
+    union_id:
+      profile.union_id,
+
+    username:
+      profile.username,
+
+    display_name:
+      profile.display_name,
+
+    bio_description:
+      profile.bio_description,
+
+    avatar_url:
+      profile.avatar_url,
+
+    follower_count:
+      Number(profile.follower_count || 0),
+
+    following_count:
+      Number(profile.following_count || 0),
+
+    likes_count:
+      Number(profile.likes_count || 0),
+
+    video_count:
+      Number(profile.video_count || 0),
+
+    profile_url:
+      profileUrl,
+
+    eligible:
+      eligibility.eligible,
+
+    last_updated:
+      new Date().toISOString(),
+  });
+
+  return connections[userId];
+}
+
+// ======================================================
+// CREATE OAUTH STATE
+// ======================================================
+
+function createOAuthState(userId) {
+  const state =
+    crypto.randomBytes(32).toString("hex");
+
+  oauthStates.set(state, {
+    userId,
+    createdAt: Date.now(),
+  });
+
+  return state;
+}
+
+// ======================================================
+// VERIFY OAUTH STATE
+// ======================================================
+
+function verifyOAuthState(state) {
+  const session =
+    oauthStates.get(state);
+
+  if (!session) {
+    return null;
+  }
+
+  oauthStates.delete(state);
+
+  if (
+    Date.now() -
+      session.createdAt >
+    10 * 60 * 1000
+  ) {
+    return null;
+  }
+
+  return session;
+      }
+
+// ======================================================
+// CHARACTER FILE
+// ======================================================
+
+function getCharacterFile(userId) {
+  const files =
+    fs.readdirSync(
+      CHARACTER_DIR,
+      {
+        withFileTypes: true,
+      }
+    );
+
+  const match =
+    files.find(file => {
+      if (!file.isFile()) {
+        return false;
+      }
+
+      return file.name.startsWith(
+        `${userId}.`
+      );
+    });
+
+  if (!match) {
+    return null;
+  }
+
+  return path.join(
+    CHARACTER_DIR,
+    match.name
+  );
+}
+
+// ======================================================
+// SAVE CHARACTER
+// ======================================================
+
+async function saveCharacter(
+  userId,
+  buffer
+) {
+  const oldFile =
+    getCharacterFile(userId);
+
+  if (oldFile) {
+    fs.unlinkSync(oldFile);
+  }
+
+  const filePath =
+    path.join(
+      CHARACTER_DIR,
+      `${userId}.png`
+    );
+
+  await sharp(buffer)
+    .png()
+    .resize({
+      width: 900,
+      height: 900,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .toFile(filePath);
+
+  return filePath;
+}
+
+// ======================================================
+// RESET CHARACTER
+// ======================================================
+
+function resetCharacter(userId) {
+  const file =
+    getCharacterFile(userId);
+
+  if (file && fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+}
+
+// ======================================================
+// MILESTONE PROCESSING
+// ======================================================
+
+async function processGrowthMilestone(
+  userId,
+  connection
+) {
+  const followers =
+    Number(
+      connection.follower_count || 0
+    );
+
+  const currentMilestone =
+    getCurrentMilestone(
+      followers
+    );
+
+  if (currentMilestone <= 0) {
+    return;
+  }
+
+  const previous =
+    Number(
+      milestones[userId]
+        ?.lastAnnouncedMilestone ||
+        0
+    );
+
+  if (
+    currentMilestone <= previous
+  ) {
+    return;
+  }
+
+  milestones[userId] = {
+    lastAnnouncedMilestone:
+      currentMilestone,
+
+    updatedAt:
+      new Date().toISOString(),
+  };
+
+  saveJSON(
+    MILESTONES_FILE,
+    milestones
+  );
+
+  console.log(
+    `🎉 ${connection.username} reached ${currentMilestone} followers`
+  );
+
+  await sendGrowthAnnouncement(
+    userId,
+    connection,
+    currentMilestone
+  );
+}
+
+// ======================================================
+// WEEKLY SNAPSHOT
+// ======================================================
+
+function saveWeeklySnapshot(
+  userId,
+  connection
+) {
+  const week =
+    getWeekKey();
+
+  const existing =
+    snapshots.find(
+      item =>
+        item.userId === userId &&
+        item.week === week
+    );
+
+  const snapshot = {
+    userId,
+
+    week,
+
+    username:
+      connection.username || "",
+
+    display_name:
+      connection.display_name || "",
+
+    avatar_url:
+      connection.avatar_url || "",
+
+    profile_url:
+      connection.profile_url ||
+      getTikTokURL(
+        connection.username
       ),
 
     followers:
-      followers >=
-      MIN_FOLLOWERS,
+      Number(
+        connection.follower_count || 0
+      ),
 
     following:
-      following >=
-      MIN_FOLLOWING,
+      Number(
+        connection.following_count || 0
+      ),
 
     likes:
-      likes >=
-      MIN_LIKES,
+      Number(
+        connection.likes_count || 0
+      ),
 
     videos:
-      videos >=
-      MIN_VIDEOS,
-
-    values: {
-      username,
-      displayName,
-      bio,
-      followers,
-      following,
-      likes,
-      videos
-    }
-  };
-}
-
-function isEligible(
-  user
-) {
-  const requirements =
-    checkTikTokRequirements(
-      user
-    );
-
-  return (
-    requirements.username &&
-    requirements.bio &&
-    requirements.followers &&
-    requirements.following &&
-    requirements.likes &&
-    requirements.videos
-  );
-}
-
-/* =========================================================
-   OAUTH STATE
-========================================================= */
-
-function createOAuthState(
-  userId
-) {
-  const timestamp =
-    Date.now();
-
-  const payload =
-    `${userId}:${timestamp}`;
-
-  const signature =
-    crypto
-      .createHmac(
-        "sha256",
-        SESSION_SECRET
-      )
-      .update(
-        payload
-      )
-      .digest(
-        "hex"
-      );
-
-  return Buffer.from(
-    `${payload}:${signature}`
-  ).toString(
-    "base64url"
-  );
-}
-
-function verifyOAuthState(
-  state
-) {
-  try {
-    const decoded =
-      Buffer.from(
-        state,
-        "base64url"
-      ).toString(
-        "utf8"
-      );
-
-    const parts =
-      decoded.split(":");
-
-    if (
-      parts.length !== 3
-    ) {
-      return null;
-    }
-
-    const userId =
-      parts[0];
-
-    const timestamp =
       Number(
-        parts[1]
-      );
+        connection.video_count || 0
+      ),
 
-    const receivedSignature =
-      parts[2];
-
-    if (
-      !userId ||
-      !timestamp ||
-      !receivedSignature
-    ) {
-      return null;
-    }
-
-    const age =
-      Date.now() -
-      timestamp;
-
-    if (
-      age < 0 ||
-      age >
-        10 * 60 * 1000
-    ) {
-      return null;
-    }
-
-    const payload =
-      `${userId}:${timestamp}`;
-
-    const expectedSignature =
-      crypto
-        .createHmac(
-          "sha256",
-          SESSION_SECRET
-        )
-        .update(
-          payload
-        )
-        .digest(
-          "hex"
-        );
-
-    const receivedBuffer =
-      Buffer.from(
-        receivedSignature
-      );
-
-    const expectedBuffer =
-      Buffer.from(
-        expectedSignature
-      );
-
-    if (
-      receivedBuffer.length !==
-      expectedBuffer.length
-    ) {
-      return null;
-    }
-
-    if (
-      !crypto.timingSafeEqual(
-        receivedBuffer,
-        expectedBuffer
-      )
-    ) {
-      return null;
-    }
-
-    return userId;
-
-  } catch (error) {
-    console.error(
-      "OAuth state verification error:",
-      error
-    );
-
-    return null;
-  }
-}
-
-/* =========================================================
-   DISCORD CLIENT
-========================================================= */
-
-const client =
-  new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMembers
-    ]
-  });
-
-/* =========================================================
-   DISCORD GATEWAY DIAGNOSTICS
-========================================================= */
-
-client.on("debug", message => {
-  console.log("🔎 Discord Debug:", message);
-});
-
-client.on("warn", message => {
-  console.warn("⚠️ Discord Warning:", message);
-});
-
-client.on("error", error => {
-  console.error("❌ Discord Client Error:", error);
-});
-
-client.on("shardError", error => {
-  console.error("❌ Discord Shard Error:", error);
-});
-
-client.on("shardDisconnect", (event, shardId) => {
-  console.error(
-    `🔌 Discord Shard ${shardId} disconnected:`,
-    event
-  );
-});
-
-client.on("shardReconnecting", shardId => {
-  console.log(
-    `🔄 Discord Shard ${shardId} reconnecting...`
-  );
-});
-
-client.on("shardReady", shardId => {
-  console.log(
-    `🟢 Discord Shard ${shardId} is ready.`
-  );
-});
-
-/* =========================================================
-   DISCORD HELPERS
-========================================================= */
-
-async function getGuild() {
-  try {
-    return await client.guilds.fetch(
-      GUILD_ID
-    );
-
-  } catch (error) {
-    console.error(
-      "Unable to fetch guild:",
-      error
-    );
-
-    return null;
-  }
-}
-
-async function getMember(
-  userId
-) {
-  try {
-    const guild =
-      await getGuild();
-
-    if (!guild) {
-      return null;
-    }
-
-    return await guild.members.fetch(
-      userId
-    );
-
-  } catch (error) {
-    console.error(
-      `Unable to fetch member ${userId}:`,
-      error
-    );
-
-    return null;
-  }
-}
-
-async function getRole(
-  roleId
-) {
-  try {
-    if (!roleId) {
-      return null;
-    }
-
-    const guild =
-      await getGuild();
-
-    if (!guild) {
-      return null;
-    }
-
-    return await guild.roles.fetch(
-      roleId
-    );
-
-  } catch (error) {
-    console.error(
-      `Unable to fetch role ${roleId}:`,
-      error
-    );
-
-    return null;
-  }
-}
-
-function canManageRole(
-  role
-) {
-  if (!role) {
-    return false;
-  }
-
-  return role.editable;
-}
-
-/* =========================================================
-   APPLY ELIGIBILITY ROLES
-========================================================= */
-
-async function applyEligibilityRoles(
-  userId
-) {
-  const member =
-    await getMember(
-      userId
-    );
-
-  if (!member) {
-    return {
-      success: false,
-      reason:
-        "Discord member not found.",
-      addedRoles: [],
-      removedRoles: []
-    };
-  }
-
-  const addedRoles = [];
-  const removedRoles = [];
-
-  /* -------------------------------------------------------
-     LAMPOON ROLE
-  ------------------------------------------------------- */
-
-  if (
-    LAMPOON_ROLE_ID &&
-    !member.roles.cache.has(
-      LAMPOON_ROLE_ID
-    )
-  ) {
-    const role =
-      await getRole(
-        LAMPOON_ROLE_ID
-      );
-
-    if (
-      role &&
-      canManageRole(
-        role
-      )
-    ) {
-      try {
-        await member.roles.add(
-          role,
-          "TikTok eligibility verification"
-        );
-
-        addedRoles.push(
-          role
-        );
-
-      } catch (error) {
-        console.error(
-          "Failed to add Lampoon role:",
-          error
-        );
-      }
-
-    } else {
-      console.error(
-        "Lampoon role cannot be managed. Check bot role hierarchy."
-      );
-    }
-  }
-
-  /* -------------------------------------------------------
-     CONTENT CREATOR ROLE
-  ------------------------------------------------------- */
-
-  if (
-    CONTENT_CREATOR_ROLE_ID &&
-    !member.roles.cache.has(
-      CONTENT_CREATOR_ROLE_ID
-    )
-  ) {
-    const role =
-      await getRole(
-        CONTENT_CREATOR_ROLE_ID
-      );
-
-    if (
-      role &&
-      canManageRole(
-        role
-      )
-    ) {
-      try {
-        await member.roles.add(
-          role,
-          "TikTok eligibility verification"
-        );
-
-        addedRoles.push(
-          role
-        );
-
-      } catch (error) {
-        console.error(
-          "Failed to add Content Creator role:",
-          error
-        );
-      }
-
-    } else {
-      console.error(
-        "Content Creator role cannot be managed."
-      );
-    }
-  }
-
-  /* -------------------------------------------------------
-     REMOVE FOLLOWERS ROLE
-  ------------------------------------------------------- */
-
-  if (
-    FOLLOWERS_ROLE_ID &&
-    member.roles.cache.has(
-      FOLLOWERS_ROLE_ID
-    )
-  ) {
-    const role =
-      await getRole(
-        FOLLOWERS_ROLE_ID
-      );
-
-    if (
-      role &&
-      canManageRole(
-        role
-      )
-    ) {
-      try {
-        await member.roles.remove(
-          role,
-          "TikTok eligibility verification"
-        );
-
-        removedRoles.push(
-          role
-        );
-
-      } catch (error) {
-        console.error(
-          "Failed to remove Followers role:",
-          error
-        );
-      }
-
-    } else {
-      console.error(
-        "Followers role cannot be managed."
-      );
-    }
-  }
-
-  return {
-    success: true,
-    member,
-    addedRoles,
-    removedRoles
+    captured_at:
+      new Date().toISOString(),
   };
+
+  if (existing) {
+    Object.assign(
+      existing,
+      snapshot
+    );
+  } else {
+    snapshots.push(snapshot);
+  }
+
+  saveJSON(
+    SNAPSHOTS_FILE,
+    snapshots
+  );
 }
 
-/* =========================================================
-   SVG BANNER
-========================================================= */
+// ======================================================
+// SNAPSHOT ALL CONNECTIONS
+// ======================================================
 
-function createBannerSVG({
-  username,
-  followers,
-  avatarUrl,
-  displayName
-}) {
-  const safeUsername =
-    escapeHtml(
-      username ||
-      "TikTok User"
+async function snapshotAllConnections() {
+  for (
+    const userId of
+    Object.keys(connections)
+  ) {
+    try {
+      const connection =
+        await updateConnectionStats(
+          userId
+        );
+
+      if (connection) {
+        saveWeeklySnapshot(
+          userId,
+          connection
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Snapshot failed for ${userId}:`,
+        error
+      );
+    }
+  }
+      }
+
+// ======================================================
+// CREATE SOLO GROWTH SVG
+// ======================================================
+
+function createGrowthSVG(
+  connection,
+  discordMember,
+  currentMilestone,
+  nextMilestone,
+  quote,
+  avatarData,
+  characterData
+) {
+  const username =
+    escapeHTML(
+      connection.username ||
+      "TikTok Creator"
     );
 
-  const safeDisplayName =
-    escapeHtml(
-      displayName ||
-      username ||
-      "LAMPOON"
+  const displayName =
+    escapeHTML(
+      connection.display_name ||
+      username
     );
 
-  const safeFollowers =
-    escapeHtml(
-      formatNumber(
-        followers
-      )
+  const discordName =
+    escapeHTML(
+      discordMember?.displayName ||
+      discordMember?.user?.username ||
+      "Discord Member"
     );
 
-  const safeAvatar =
-    escapeHtml(
-      avatarUrl ||
-      "https://cdn.discordapp.com/embed/avatars/0.png"
+  const followers =
+    formatNumber(
+      connection.follower_count
     );
+
+  const likes =
+    formatNumber(
+      connection.likes_count
+    );
+
+  const following =
+    formatNumber(
+      connection.following_count
+    );
+
+  const videos =
+    formatNumber(
+      connection.video_count
+    );
+
+  const avatar =
+    avatarData
+      ? `data:image/png;base64,${avatarData.toString("base64")}`
+      : "";
+
+  const character =
+    characterData
+      ? `data:image/png;base64,${characterData.toString("base64")}`
+      : "";
+
+  const safeQuote =
+    escapeHTML(quote);
 
   return `
-<svg xmlns="http://www.w3.org/2000/svg"
-     width="1200"
-     height="420"
-     viewBox="0 0 1200 420">
-
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1600"
+  height="900"
+  viewBox="0 0 1600 900"
+>
   <defs>
 
     <linearGradient
-      id="bg"
+      id="background"
       x1="0"
       y1="0"
       x2="1"
-      y2="1">
-
+      y2="1"
+    >
       <stop
         offset="0%"
-        stop-color="#111111"/>
+        stop-color="#090909"
+      />
 
       <stop
         offset="50%"
-        stop-color="#262626"/>
+        stop-color="#161616"
+      />
 
       <stop
         offset="100%"
-        stop-color="#090909"/>
-
+        stop-color="#2a1710"
+      />
     </linearGradient>
 
     <linearGradient
@@ -1016,342 +980,2145 @@ function createBannerSVG({
       x1="0"
       y1="0"
       x2="1"
-      y2="1">
-
+      y2="1"
+    >
       <stop
         offset="0%"
-        stop-color="#5F3203"/>
-
-      <stop
-        offset="25%"
-        stop-color="#C48D21"/>
+        stop-color="#C48D21"
+      />
 
       <stop
         offset="50%"
-        stop-color="#F8D85C"/>
-
-      <stop
-        offset="70%"
-        stop-color="#D9A52E"/>
+        stop-color="#F8D85C"
+      />
 
       <stop
         offset="100%"
-        stop-color="#5F3203"/>
-
+        stop-color="#8A5A12"
+      />
     </linearGradient>
+
+    <filter
+      id="shadow"
+      x="-30%"
+      y="-30%"
+      width="160%"
+      height="160%"
+    >
+      <feDropShadow
+        dx="0"
+        dy="12"
+        stdDeviation="12"
+        flood-opacity="0.55"
+      />
+    </filter>
 
     <clipPath id="avatarClip">
       <circle
-        cx="175"
-        cy="210"
-        r="110"/>
+        cx="170"
+        cy="170"
+        r="105"
+      />
     </clipPath>
 
   </defs>
 
   <rect
-    width="1200"
-    height="420"
-    rx="28"
-    fill="url(#bg)"
+    width="1600"
+    height="900"
+    fill="url(#background)"
   />
 
   <rect
-    x="8"
-    y="8"
-    width="1184"
-    height="404"
-    rx="22"
+    x="40"
+    y="40"
+    width="1520"
+    height="820"
+    rx="45"
     fill="none"
     stroke="url(#gold)"
-    stroke-width="8"
+    stroke-width="5"
   />
 
   <circle
-    cx="175"
-    cy="210"
-    r="118"
-    fill="#000000"
+    cx="170"
+    cy="170"
+    r="115"
+    fill="#111"
     stroke="url(#gold)"
     stroke-width="8"
+    filter="url(#shadow)"
   />
 
-  <image
-    href="${safeAvatar}"
-    x="65"
-    y="100"
-    width="220"
-    height="220"
-    preserveAspectRatio="xMidYMid slice"
-    clip-path="url(#avatarClip)"
-  />
+  ${
+    avatar
+      ? `
+      <image
+        href="${avatar}"
+        x="65"
+        y="65"
+        width="210"
+        height="210"
+        preserveAspectRatio="xMidYMid slice"
+        clip-path="url(#avatarClip)"
+      />
+      `
+      : ""
+  }
 
   <text
     x="330"
-    y="105"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="38"
+    y="125"
+    fill="#F8D85C"
+    font-family="Arial, sans-serif"
+    font-size="32"
     font-weight="700"
-    fill="#F8D85C">
-    LAMPOON
+  >
+    TIKTOK SOLO GROWTH
   </text>
 
   <text
     x="330"
-    y="155"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="28"
-    font-weight="700"
-    fill="#FFFFFF">
-    LAMPOON MEMBERS
+    y="180"
+    fill="#ffffff"
+    font-family="Arial, sans-serif"
+    font-size="58"
+    font-weight="800"
+  >
+    @${username}
   </text>
 
   <text
     x="330"
-    y="215"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="34"
-    font-weight="700"
-    fill="#FFFFFF">
-    @${safeUsername}
+    y="225"
+    fill="#cfcfcf"
+    font-family="Arial, sans-serif"
+    font-size="27"
+  >
+    ${displayName}
   </text>
 
   <text
     x="330"
     y="265"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="25"
-    fill="#D9D9D9">
-    ${safeDisplayName}
+    fill="#999999"
+    font-family="Arial, sans-serif"
+    font-size="23"
+  >
+    Discord: ${discordName}
+  </text>
+
+  <rect
+    x="80"
+    y="355"
+    width="430"
+    height="180"
+    rx="30"
+    fill="#111111"
+    stroke="#C48D21"
+    stroke-width="3"
+  />
+
+  <text
+    x="110"
+    y="405"
+    fill="#999999"
+    font-family="Arial, sans-serif"
+    font-size="22"
+  >
+    FOLLOWERS
   </text>
 
   <text
-    x="330"
-    y="330"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="31"
+    x="110"
+    y="475"
+    fill="#F8D85C"
+    font-family="Arial, sans-serif"
+    font-size="58"
+    font-weight="800"
+  >
+    ${followers}
+  </text>
+
+  <text
+    x="110"
+    y="515"
+    fill="#ffffff"
+    font-family="Arial, sans-serif"
+    font-size="22"
+  >
+    Current Milestone:
+    ${formatNumber(currentMilestone)}
+  </text>
+
+  <rect
+    x="560"
+    y="355"
+    width="430"
+    height="180"
+    rx="30"
+    fill="#111111"
+    stroke="#C48D21"
+    stroke-width="3"
+  />
+
+  <text
+    x="590"
+    y="405"
+    fill="#999999"
+    font-family="Arial, sans-serif"
+    font-size="22"
+  >
+    NEXT MILESTONE
+  </text>
+
+  <text
+    x="590"
+    y="475"
+    fill="#F8D85C"
+    font-family="Arial, sans-serif"
+    font-size="58"
+    font-weight="800"
+  >
+    ${formatNumber(nextMilestone)}
+  </text>
+
+  <text
+    x="590"
+    y="515"
+    fill="#ffffff"
+    font-family="Arial, sans-serif"
+    font-size="22"
+  >
+    Keep growing.
+  </text>
+
+  <rect
+    x="1040"
+    y="100"
+    width="430"
+    height="435"
+    rx="35"
+    fill="#0e0e0e"
+    stroke="#C48D21"
+    stroke-width="3"
+  />
+
+  ${
+    character
+      ? `
+      <image
+        href="${character}"
+        x="1080"
+        y="125"
+        width="350"
+        height="350"
+        preserveAspectRatio="xMidYMid meet"
+      />
+      `
+      : `
+      <text
+        x="1255"
+        y="300"
+        text-anchor="middle"
+        fill="#666666"
+        font-family="Arial, sans-serif"
+        font-size="28"
+      >
+        LAMPOON CREATOR
+      </text>
+      `
+  }
+
+  <rect
+    x="80"
+    y="590"
+    width="1390"
+    height="180"
+    rx="35"
+    fill="#0c0c0c"
+    stroke="#5F3203"
+    stroke-width="3"
+  />
+
+  <text
+    x="120"
+    y="640"
+    fill="#F8D85C"
+    font-family="Arial, sans-serif"
+    font-size="24"
     font-weight="700"
-    fill="#F8D85C">
-    ${safeFollowers} Followers
+  >
+    GROWTH MANIFESTATION
   </text>
 
   <text
-    x="330"
-    y="370"
-    font-family="Arial, Helvetica, sans-serif"
+    x="120"
+    y="695"
+    fill="#ffffff"
+    font-family="Arial, sans-serif"
+    font-size="28"
+  >
+    ${safeQuote}
+  </text>
+
+  <text
+    x="120"
+    y="735"
+    fill="#999999"
+    font-family="Arial, sans-serif"
     font-size="21"
-    fill="#AAAAAA">
-    TikTok Creator Verification
+  >
+    Likes: ${likes}
+    • Following: ${following}
+    • Videos: ${videos}
   </text>
 
 </svg>
 `;
-}
+    }
 
-/* =========================================================
-   SEND ELIGIBILITY LOG
-========================================================= */
+// ======================================================
+// DOWNLOAD IMAGE
+// ======================================================
 
-async function sendEligibilityLog({
-  userId,
-  member,
-  tiktokUser,
-  addedRoles,
-  removedRoles
-}) {
-  if (!LOG_CHANNEL_ID) {
-    console.log(
-      "LOG_CHANNEL_ID is not configured."
+async function downloadBuffer(url) {
+  if (!url) return null;
+
+  try {
+    const response =
+      await fetch(url);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return Buffer.from(
+      await response.arrayBuffer()
+    );
+  } catch (error) {
+    console.error(
+      "Image download failed:",
+      error
     );
 
-    return;
+    return null;
+  }
+}
+
+// ======================================================
+// CREATE SOLO GROWTH BANNER
+// ======================================================
+
+async function createGrowthBanner(
+  userId,
+  connection,
+  guild
+) {
+  let member = null;
+
+  try {
+    member =
+      await guild.members.fetch(
+        userId
+      );
+  } catch {
+    member = null;
   }
 
-  if (
-    !addedRoles ||
-    addedRoles.length === 0
+  const avatarData =
+    await downloadBuffer(
+      connection.avatar_url
+    );
+
+  const characterFile =
+    getCharacterFile(userId);
+
+  const characterData =
+    characterFile
+      ? fs.readFileSync(
+          characterFile
+        )
+      : null;
+
+  const currentMilestone =
+    getCurrentMilestone(
+      connection.follower_count
+    );
+
+  const nextMilestone =
+    getNextMilestone(
+      connection.follower_count
+    );
+
+  const quote =
+    randomItem(
+      GROWTH_QUOTES
+    );
+
+  const svg =
+    createGrowthSVG(
+      connection,
+      member,
+      currentMilestone,
+      nextMilestone,
+      quote,
+      avatarData,
+      characterData
+    );
+
+  return sharp(
+    Buffer.from(svg)
+  )
+    .png()
+    .toBuffer();
+}
+
+// ======================================================
+// GROWTH EMBED
+// ======================================================
+
+function createGrowthEmbed(
+  connection,
+  currentMilestone,
+  nextMilestone,
+  attachmentName
+) {
+  const profileUrl =
+    connection.profile_url ||
+    getTikTokURL(
+      connection.username
+    );
+
+  return new EmbedBuilder()
+    .setColor("#C48D21")
+    .setTitle(
+      `${TIKTOK_EMOJI} TikTok Solo Growth`
+    )
+    .setDescription(
+      [
+        `**[@${connection.username}](${profileUrl})**`,
+        "",
+        `🎯 **Current Milestone:** ${formatNumber(
+          currentMilestone
+        )}`,
+        `🚀 **Next Milestone:** ${formatNumber(
+          nextMilestone
+        )}`,
+        "",
+        `👥 **Followers:** ${formatNumber(
+          connection.follower_count
+        )}`,
+        `❤️ **Likes:** ${formatNumber(
+          connection.likes_count
+        )}`,
+        `➕ **Following:** ${formatNumber(
+          connection.following_count
+        )}`,
+        `🎬 **Videos:** ${formatNumber(
+          connection.video_count
+        )}`,
+      ].join("\n")
+    )
+    .setImage(
+      `attachment://${attachmentName}`
+    )
+    .setFooter({
+      text:
+        "Lampoon • TikTok Solo Growth",
+    })
+    .setTimestamp();
+}
+
+// ======================================================
+// LEADERBOARD ELIGIBILITY
+// ======================================================
+
+async function getLeaderboardMembers(
+  guild
+) {
+  const result = [];
+
+  for (
+    const [userId, connection]
+    of Object.entries(connections)
   ) {
+    try {
+      const member =
+        await guild.members.fetch(
+          userId
+        );
+
+      const hasTikTokRole =
+        TIKTOK_ROLE_ID &&
+        member.roles.cache.has(
+          TIKTOK_ROLE_ID
+        );
+
+      const hasLampoonRole =
+        LAMPOON_ROLE_ID &&
+        member.roles.cache.has(
+          LAMPOON_ROLE_ID
+        );
+
+      if (
+        !hasTikTokRole &&
+        !hasLampoonRole
+      ) {
+        continue;
+      }
+
+      if (
+        !connection.username
+      ) {
+        continue;
+      }
+
+      result.push({
+        userId,
+        member,
+        connection,
+      });
+    } catch {
+      // Member may no longer exist.
+    }
+  }
+
+  return result;
+}
+
+// ======================================================
+// LEADERBOARD SVG
+// ======================================================
+
+async function createLeaderboardImage(
+  entries
+) {
+  const width = 1600;
+  const rowHeight = 105;
+  const height =
+    250 +
+    entries.length *
+      rowHeight;
+
+  let rows = "";
+
+  for (
+    let i = 0;
+    i < entries.length;
+    i++
+  ) {
+    const entry =
+      entries[i];
+
+    const y =
+      250 +
+      i * rowHeight;
+
+    const avatar =
+      await downloadBuffer(
+        entry.connection.avatar_url
+      );
+
+    const avatarData =
+      avatar
+        ? `data:image/png;base64,${avatar.toString(
+            "base64"
+          )}`
+        : "";
+
+    const rank =
+      i === 0
+        ? "🥇"
+        : i === 1
+        ? "🥈"
+        : i === 2
+        ? "🥉"
+        : `#${i + 1}`;
+
+    const username =
+      escapeHTML(
+        entry.connection.username ||
+        "Unknown"
+      );
+
+    rows += `
+      <rect
+        x="70"
+        y="${y}"
+        width="1460"
+        height="85"
+        rx="22"
+        fill="#111111"
+        stroke="#5F3203"
+        stroke-width="2"
+      />
+
+      ${
+        avatarData
+          ? `
+          <circle
+            cx="145"
+            cy="${y + 42}"
+            r="32"
+            fill="#222"
+          />
+
+          <clipPath id="avatar${i}">
+            <circle
+              cx="145"
+              cy="${y + 42}"
+              r="32"
+            />
+          </clipPath>
+
+          <image
+            href="${avatarData}"
+            x="113"
+            y="${y + 10}"
+            width="64"
+            height="64"
+            preserveAspectRatio="xMidYMid slice"
+            clip-path="url(#avatar${i})"
+          />
+          `
+          : ""
+      }
+
+      <text
+        x="215"
+        y="${y + 53}"
+        fill="#F8D85C"
+        font-family="Arial, sans-serif"
+        font-size="32"
+        font-weight="800"
+      >
+        ${rank}
+      </text>
+
+      <text
+        x="330"
+        y="${y + 48}"
+        fill="#ffffff"
+        font-family="Arial, sans-serif"
+        font-size="30"
+        font-weight="700"
+      >
+        @${username}
+      </text>
+
+      <text
+        x="1000"
+        y="${y + 48}"
+        fill="#F8D85C"
+        font-family="Arial, sans-serif"
+        font-size="30"
+        font-weight="700"
+      >
+        ${formatNumber(
+          entry.connection.follower_count
+        )}
+      </text>
+
+      <text
+        x="1230"
+        y="${y + 48}"
+        fill="#aaaaaa"
+        font-family="Arial, sans-serif"
+        font-size="22"
+      >
+        followers
+      </text>
+    `;
+  }
+
+  const svg = `
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="${width}"
+  height="${height}"
+>
+  <defs>
+    <linearGradient
+      id="bg"
+      x1="0"
+      y1="0"
+      x2="1"
+      y2="1"
+    >
+      <stop
+        offset="0%"
+        stop-color="#080808"
+      />
+
+      <stop
+        offset="100%"
+        stop-color="#21150b"
+      />
+    </linearGradient>
+
+    <linearGradient
+      id="gold"
+      x1="0"
+      y1="0"
+      x2="1"
+      y2="1"
+    >
+      <stop
+        offset="0%"
+        stop-color="#C48D21"
+      />
+
+      <stop
+        offset="50%"
+        stop-color="#F8D85C"
+      />
+
+      <stop
+        offset="100%"
+        stop-color="#7A4A0B"
+      />
+    </linearGradient>
+  </defs>
+
+  <rect
+    width="${width}"
+    height="${height}"
+    fill="url(#bg)"
+  />
+
+  <rect
+    x="35"
+    y="35"
+    width="${width - 70}"
+    height="${height - 70}"
+    rx="40"
+    fill="none"
+    stroke="url(#gold)"
+    stroke-width="5"
+  />
+
+  <text
+    x="800"
+    y="100"
+    text-anchor="middle"
+    fill="#F8D85C"
+    font-family="Arial, sans-serif"
+    font-size="42"
+    font-weight="800"
+  >
+    TIKTOK WEEKLY LEADERBOARD
+  </text>
+
+  <text
+    x="800"
+    y="150"
+    text-anchor="middle"
+    fill="#999999"
+    font-family="Arial, sans-serif"
+    font-size="22"
+  >
+    Top 10 Lampoon TikTok Creators
+  </text>
+
+  ${rows}
+
+</svg>
+`;
+
+  return sharp(
+    Buffer.from(svg)
+  )
+    .png()
+    .toBuffer();
+}
+
+// ======================================================
+// LEADERBOARD EMBED
+// ======================================================
+
+function createLeaderboardEmbed(
+  entries,
+  attachmentName
+) {
+  const lines = [];
+
+  if (entries[0]) {
+    lines.push(
+      `🥇 <@${entries[0].userId}>`
+    );
+  }
+
+  if (entries[1]) {
+    lines.push(
+      `🥈 <@${entries[1].userId}>`
+    );
+  }
+
+  if (entries[2]) {
+    lines.push(
+      `🥉 <@${entries[2].userId}>`
+    );
+  }
+
+  return new EmbedBuilder()
+    .setColor("#C48D21")
+    .setTitle(
+      `${TIKTOK_EMOJI} Weekly TikTok Leaderboard`
+    )
+    .setDescription(
+      [
+        ...lines,
+        "",
+        "Leaderboard rankings are based on current TikTok follower count.",
+        "",
+        "Click the TikTok profile links below to view the creators.",
+      ].join("\n")
+    )
+    .setImage(
+      `attachment://${attachmentName}`
+    )
+    .setFooter({
+      text:
+        "Lampoon • Weekly TikTok Leaderboard",
+    })
+    .setTimestamp();
+}
+
+// ======================================================
+// SLASH COMMANDS
+// ======================================================
+
+const commands = [
+
+  new SlashCommandBuilder()
+    .setName("tiktok")
+    .setDescription(
+      "Connect your TikTok account to Lampoon."
+    ),
+
+  new SlashCommandBuilder()
+    .setName("tiktokstatus")
+    .setDescription(
+      "View your TikTok connection status."
+    ),
+
+  new SlashCommandBuilder()
+    .setName("tiktokgrowth")
+    .setDescription(
+      "View your TikTok Solo Growth."
+    ),
+
+  new SlashCommandBuilder()
+    .setName("tiktokleaderboard")
+    .setDescription(
+      "Manage the weekly TikTok leaderboard."
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName("update")
+        .setDescription(
+          "Update TikTok stats and weekly snapshots."
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName("post")
+        .setDescription(
+          "Post the current TikTok leaderboard."
+        )
+    ),
+
+  new SlashCommandBuilder()
+    .setName("growthcharacter")
+    .setDescription(
+      "Manage a member's Solo Growth character."
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName("set")
+        .setDescription(
+          "Set a custom character."
+        )
+        .addUserOption(option =>
+          option
+            .setName("member")
+            .setDescription(
+              "Discord member."
+            )
+            .setRequired(true)
+        )
+        .addAttachmentOption(option =>
+          option
+            .setName("image")
+            .setDescription(
+              "Character image."
+            )
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName("preview")
+        .setDescription(
+          "Preview a member's character."
+        )
+        .addUserOption(option =>
+          option
+            .setName("member")
+            .setDescription(
+              "Discord member."
+            )
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName("reset")
+        .setDescription(
+          "Reset a member's character."
+        )
+        .addUserOption(option =>
+          option
+            .setName("member")
+            .setDescription(
+              "Discord member."
+            )
+            .setRequired(true)
+        )
+    ),
+
+];
+
+// ======================================================
+// DISCORD DEBUG
+// ======================================================
+
+client.on(
+  "debug",
+  message => {
+    console.log(
+      "🔎 Discord Debug:",
+      message
+    );
+  }
+);
+
+client.on(
+  "warn",
+  message => {
+    console.warn(
+      "⚠️ Discord Warning:",
+      message
+    );
+  }
+);
+
+client.on(
+  "error",
+  error => {
+    console.error(
+      "❌ Discord Client Error:",
+      error
+    );
+  }
+);
+
+client.on(
+  "shardError",
+  error => {
+    console.error(
+      "❌ Discord Shard Error:",
+      error
+    );
+  }
+);
+
+client.on(
+  "shardReady",
+  shardId => {
+    console.log(
+      `🟢 Discord Shard ${shardId} ready.`
+    );
+  }
+);
+
+client.on(
+  "shardReconnecting",
+  shardId => {
+    console.log(
+      `🔄 Discord Shard ${shardId} reconnecting.`
+    );
+  }
+);
+
+client.on(
+  "shardDisconnect",
+  (event, shardId) => {
+    console.error(
+      `🔌 Discord Shard ${shardId} disconnected:`,
+      event
+    );
+  }
+);
+
+// ======================================================
+// DISCORD READY
+// ======================================================
+
+client.once(
+  "ready",
+  async () => {
+    console.log(
+      `🟢 Discord bot online as ${client.user.tag}`
+    );
+
+    try {
+      const guild =
+        await client.guilds.fetch(
+          GUILD_ID
+        );
+
+      await guild.commands.set(
+        commands.map(command =>
+          command.toJSON()
+        )
+      );
+
+      console.log(
+        `Registered ${commands.length} slash commands in ${guild.name}.`
+      );
+    } catch (error) {
+      console.error(
+        "Slash command registration failed:",
+        error
+      );
+    }
+  }
+);
+
+// ======================================================
+// INTERACTIONS
+// ======================================================
+
+client.on(
+  "interactionCreate",
+  async interaction => {
+
+    try {
+
+      // ==================================================
+      // SLASH COMMANDS
+      // ==================================================
+
+      if (
+        interaction.isChatInputCommand()
+      ) {
+
+        // ----------------------------------------------
+        // /tiktok
+        // ----------------------------------------------
+
+        if (
+          interaction.commandName ===
+          "tiktok"
+        ) {
+
+          const member =
+            await interaction.guild.members.fetch(
+              interaction.user.id
+            );
+
+          if (
+            TIKTOK_ROLE_ID &&
+            !member.roles.cache.has(
+              TIKTOK_ROLE_ID
+            )
+          ) {
+            return interaction.reply({
+              content:
+                "❌ You need the **TikTok** role before connecting your TikTok account.",
+              ephemeral: true,
+            });
+          }
+
+          const connectUrl =
+            `${BASE_URL}/tiktok/connect?user_id=${encodeURIComponent(
+              interaction.user.id
+            )}`;
+
+          const row =
+            new ActionRowBuilder()
+              .addComponents(
+
+                new ButtonBuilder()
+                  .setLabel(
+                    "Connect TikTok"
+                  )
+                  .setStyle(
+                    ButtonStyle.Link
+                  )
+                  .setURL(
+                    connectUrl
+                  ),
+
+                new ButtonBuilder()
+                  .setLabel(
+                    "Privacy Policy"
+                  )
+                  .setStyle(
+                    ButtonStyle.Link
+                  )
+                  .setURL(
+                    `${BASE_URL}/privacy/`
+                  ),
+
+                new ButtonBuilder()
+                  .setLabel(
+                    "Terms of Service"
+                  )
+                  .setStyle(
+                    ButtonStyle.Link
+                  )
+                  .setURL(
+                    `${BASE_URL}/terms/`
+                  )
+              );
+
+          const embed =
+            new EmbedBuilder()
+              .setColor("#C48D21")
+              .setTitle(
+                `${TIKTOK_EMOJI} Lampoon TikTok Verification`
+              )
+              .setDescription(
+                [
+                  "Connect your TikTok account with Lampoon.",
+                  "",
+                  "**TikTok Requirements**",
+                  `• Username/display name contains **LMP**`,
+                  `• Bio contains **LMP Members** or **Lampoon Creator**`,
+                  `• At least **${formatNumber(
+                    REQUIREMENTS.minFollowers
+                  )} followers**`,
+                  `• At least **${formatNumber(
+                    REQUIREMENTS.minFollowing
+                  )} following**`,
+                  `• At least **${formatNumber(
+                    REQUIREMENTS.minLikes
+                  )} likes**`,
+                  `• At least **${REQUIREMENTS.minVideos} videos**`,
+                  "",
+                  "After connecting, your TikTok account can automatically power your **Solo Growth** and **Weekly Leaderboard** profile.",
+                  "",
+                  `Your TikTok profile will be linked automatically.`
+                ].join("\n")
+              )
+              .setFooter({
+                text:
+                  "Lampoon Role Manager • TikTok Integration",
+              });
+
+          return interaction.reply({
+            embeds: [embed],
+            components: [row],
+            ephemeral: true,
+          });
+        }
+
+        // ----------------------------------------------
+        // /tiktokstatus
+        // ----------------------------------------------
+
+        if (
+          interaction.commandName ===
+          "tiktokstatus"
+        ) {
+
+          let connection =
+            getConnection(
+              interaction.user.id
+            );
+
+          if (!connection) {
+            return interaction.reply({
+              content:
+                "❌ You have not connected a TikTok account yet. Use `/tiktok` to connect.",
+              ephemeral: true,
+            });
+          }
+
+          connection =
+            await updateConnectionStats(
+              interaction.user.id
+            );
+
+          const profileUrl =
+            connection.profile_url ||
+            getTikTokURL(
+              connection.username
+            );
+
+          const embed =
+            new EmbedBuilder()
+              .setColor(
+                connection.eligible
+                  ? "#57F287"
+                  : "#ED4245"
+              )
+              .setTitle(
+                `${TIKTOK_EMOJI} TikTok Status`
+              )
+              .setDescription(
+                [
+                  `**[@${connection.username}](${profileUrl})**`,
+                  "",
+                  `Eligibility: ${
+                    connection.eligible
+                      ? "✅ Eligible"
+                      : "❌ Not Eligible"
+                  }`,
+                  "",
+                  `👥 Followers: **${formatNumber(
+                    connection.follower_count
+                  )}**`,
+                  `❤️ Likes: **${formatNumber(
+                    connection.likes_count
+                  )}**`,
+                  `➕ Following: **${formatNumber(
+                    connection.following_count
+                  )}**`,
+                  `🎬 Videos: **${formatNumber(
+                    connection.video_count
+                  )}**`,
+                ].join("\n")
+              )
+              .setThumbnail(
+                connection.avatar_url ||
+                  null
+              );
+
+          return interaction.reply({
+            embeds: [embed],
+            ephemeral: true,
+          });
+        }
+
+        // ----------------------------------------------
+        // /tiktokgrowth
+        // ----------------------------------------------
+
+        if (
+          interaction.commandName ===
+          "tiktokgrowth"
+        ) {
+
+          let connection =
+            getConnection(
+              interaction.user.id
+            );
+
+          if (!connection) {
+            return interaction.reply({
+              content:
+                "❌ Connect your TikTok first with `/tiktok`.",
+              ephemeral: true,
+            });
+          }
+
+          await interaction.deferReply({
+            ephemeral: true,
+          });
+
+          connection =
+            await updateConnectionStats(
+              interaction.user.id
+            );
+
+          const guild =
+            interaction.guild;
+
+          const banner =
+            await createGrowthBanner(
+              interaction.user.id,
+              connection,
+              guild
+            );
+
+          const fileName =
+            "solo-growth.png";
+
+          const attachment =
+            new AttachmentBuilder(
+              banner,
+              {
+                name: fileName,
+              }
+            );
+
+          const currentMilestone =
+            getCurrentMilestone(
+              connection.follower_count
+            );
+
+          const nextMilestone =
+            getNextMilestone(
+              connection.follower_count
+            );
+
+          const embed =
+            createGrowthEmbed(
+              connection,
+              currentMilestone,
+              nextMilestone,
+              fileName
+            );
+
+          return interaction.editReply({
+            embeds: [embed],
+            files: [attachment],
+          });
+        }
+
+        // ----------------------------------------------
+        // /tiktokleaderboard update
+        // ----------------------------------------------
+
+        if (
+          interaction.commandName ===
+          "tiktokleaderboard"
+        ) {
+
+          const subcommand =
+            interaction.options.getSubcommand();
+
+          if (
+            subcommand === "update"
+          ) {
+
+            await interaction.deferReply({
+              ephemeral: true,
+            });
+
+            await snapshotAllConnections();
+
+            return interaction.editReply(
+              "✅ TikTok statistics and weekly snapshots have been updated."
+            );
+          }
+
+          // --------------------------------------------
+          // leaderboard post
+          // --------------------------------------------
+
+          if (
+            subcommand === "post"
+          ) {
+
+            await interaction.deferReply({
+              ephemeral: true,
+            });
+
+            const guild =
+              interaction.guild;
+
+            const members =
+              await getLeaderboardMembers(
+                guild
+              );
+
+            members.sort(
+              (a, b) =>
+                Number(
+                  b.connection.follower_count ||
+                  0
+                ) -
+                Number(
+                  a.connection.follower_count ||
+                  0
+                )
+            );
+
+            const top10 =
+              members.slice(0, 10);
+
+            if (!top10.length) {
+              return interaction.editReply(
+                "❌ No eligible TikTok/Lampoon members were found."
+              );
+            }
+
+            const image =
+              await createLeaderboardImage(
+                top10
+              );
+
+            const fileName =
+              "tiktok-leaderboard.png";
+
+            const attachment =
+              new AttachmentBuilder(
+                image,
+                {
+                  name: fileName,
+                }
+              );
+
+            const embed =
+              createLeaderboardEmbed(
+                top10,
+                fileName
+              );
+
+            const channel =
+              await client.channels.fetch(
+                TIKTOK_LEADERBOARD_CHANNEL_ID
+              );
+
+            if (
+              !channel ||
+              !channel.isTextBased()
+            ) {
+              return interaction.editReply(
+                "❌ Leaderboard channel is not configured correctly."
+              );
+            }
+
+            await channel.send({
+              embeds: [embed],
+              files: [attachment],
+            });
+
+            await interaction.editReply(
+              "✅ TikTok leaderboard posted."
+            );
+          }
+        }
+
+        // ----------------------------------------------
+        // /growthcharacter
+        // ----------------------------------------------
+
+        if (
+          interaction.commandName ===
+          "growthcharacter"
+        ) {
+
+          const subcommand =
+            interaction.options.getSubcommand();
+
+          // Admin/staff protection
+          if (
+            !interaction.memberPermissions?.has(
+              "ManageGuild"
+            )
+          ) {
+            return interaction.reply({
+              content:
+                "❌ You need **Manage Server** permission to manage growth characters.",
+              ephemeral: true,
+            });
+          }
+
+          const user =
+            interaction.options.getUser(
+              "member"
+            );
+
+          // --------------------------------------------
+          // SET
+          // --------------------------------------------
+
+          if (
+            subcommand === "set"
+          ) {
+
+            const attachment =
+              interaction.options.getAttachment(
+                "image"
+              );
+
+            if (!attachment) {
+              return interaction.reply({
+                content:
+                  "❌ Please upload a character image.",
+                ephemeral: true,
+              });
+            }
+
+            const allowed =
+              [
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+              ];
+
+            if (
+              !allowed.includes(
+                attachment.contentType
+              )
+            ) {
+              return interaction.reply({
+                content:
+                  "❌ Please use PNG, JPG, or WEBP.",
+                ephemeral: true,
+              });
+            }
+
+            await interaction.deferReply({
+              ephemeral: true,
+            });
+
+            const response =
+              await fetch(
+                attachment.url
+              );
+
+            if (!response.ok) {
+              return interaction.editReply(
+                "❌ Failed to download the character image."
+              );
+            }
+
+            const buffer =
+              Buffer.from(
+                await response.arrayBuffer()
+              );
+
+            await saveCharacter(
+              user.id,
+              buffer
+            );
+
+            return interaction.editReply(
+              `✅ Custom Solo Growth character saved for **${user.username}**.`
+            );
+          }
+
+          // --------------------------------------------
+          // PREVIEW
+          // --------------------------------------------
+
+          if (
+            subcommand === "preview"
+          ) {
+
+            const file =
+              getCharacterFile(
+                user.id
+              );
+
+            if (!file) {
+              return interaction.reply({
+                content:
+                  "❌ This member does not have a custom character.",
+                ephemeral: true,
+              });
+            }
+
+            return interaction.reply({
+              content:
+                `🎨 Custom character for **${user.username}**`,
+              files: [file],
+              ephemeral: true,
+            });
+          }
+
+          // --------------------------------------------
+          // RESET
+          // --------------------------------------------
+
+          if (
+            subcommand === "reset"
+          ) {
+
+            const file =
+              getCharacterFile(
+                user.id
+              );
+
+            if (!file) {
+              return interaction.reply({
+                content:
+                  "ℹ️ This member does not have a custom character.",
+                ephemeral: true,
+              });
+            }
+
+            resetCharacter(
+              user.id
+            );
+
+            return interaction.reply({
+              content:
+                `✅ Custom Solo Growth character reset for **${user.username}**.`,
+              ephemeral: true,
+            });
+          }
+        }
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Interaction error:",
+        error
+      );
+
+      if (
+        interaction.deferred
+      ) {
+        await interaction.editReply(
+          "❌ An unexpected error occurred."
+        ).catch(() => {});
+      } else if (
+        !interaction.replied
+      ) {
+        await interaction.reply({
+          content:
+            "❌ An unexpected error occurred.",
+          ephemeral: true,
+        }).catch(() => {});
+      }
+    }
+  }
+);
+
+// ======================================================
+// GROWTH ANNOUNCEMENT
+// ======================================================
+
+async function sendGrowthAnnouncement(
+  userId,
+  connection,
+  milestone
+) {
+  if (!LOG_CHANNEL_ID) {
     return;
   }
 
   try {
+    const guild =
+      await client.guilds.fetch(
+        GUILD_ID
+      );
+
+    const member =
+      await guild.members.fetch(
+        userId
+      );
+
+    const banner =
+      await createGrowthBanner(
+        userId,
+        connection,
+        guild
+      );
+
+    const fileName =
+      "growth-milestone.png";
+
+    const attachment =
+      new AttachmentBuilder(
+        banner,
+        {
+          name: fileName,
+        }
+      );
+
+    const profileUrl =
+      connection.profile_url ||
+      getTikTokURL(
+        connection.username
+      );
+
+    const embed =
+      new EmbedBuilder()
+        .setColor("#F8D85C")
+        .setTitle(
+          `🎉 ${TIKTOK_EMOJI} Growth Milestone Reached!`
+        )
+        .setDescription(
+          [
+            `<@${userId}> has reached **${formatNumber(
+              milestone
+            )} TikTok followers!**`,
+            "",
+            `**[@${connection.username}](${profileUrl})**`,
+            "",
+            "Keep creating. Keep growing.",
+          ].join("\n")
+        )
+        .setImage(
+          `attachment://${fileName}`
+        )
+        .setFooter({
+          text:
+            "Lampoon • Solo Growth",
+        });
+
     const channel =
       await client.channels.fetch(
         LOG_CHANNEL_ID
       );
 
     if (
-      !channel ||
-      !channel.isTextBased()
+      channel?.isTextBased()
     ) {
-      console.error(
-        "Eligibility log channel is not a text channel."
-      );
-
-      return;
-    }
-
-    const nickname =
-      member.nickname ||
-      member.user.globalName ||
-      member.user.username;
-
-    const serverName =
-      member.guild.name;
-
-    const addedMentions =
-      addedRoles
-        .map(
-          role =>
-            `<@&${role.id}>`
-        )
-        .join(" ");
-
-    const removedNames =
-      removedRoles.length
-        ? removedRoles
-            .map(
-              role =>
-                role.name
-            )
-            .join(", ")
-        : "None";
-
-    const joinedDate =
-      formatDate();
-
-    const joinedTime =
-      formatTime();
-
-    const tiktokUsername =
-      tiktokUser.username ||
-      tiktokUser.display_name ||
-      "Unknown";
-
-    const followers =
-      numberValue(
-        tiktokUser.follower_count
-      );
-
-    const embed =
-      new EmbedBuilder()
-        .setColor(
-          "#C48D21"
-        )
-        .setDescription(
-`<a:Avisala:1542448826265243660> **Avisala, ${member}!**
-
-**${escapeHtml(nickname)}** is now officially recognized as a **𝗟𝗔𝗠𝗣𝗢𝗢𝗡** member on **${escapeHtml(serverName)}**.
-
-🏷️ **Member Role**
-${addedMentions}
-
-🔄 **Previous Role**
-${escapeHtml(removedNames)}
-
-📌 **LMP Tag**
-Check out <#${LMP_TAG_CHANNEL_ID}> to request your nickname with the LMP tag.
-
-**TikTok:** [@${escapeHtml(tiktokUsername)}](https://www.tiktok.com/@${encodeURIComponent(tiktokUsername)})
-
-**Followers:** ${formatNumber(followers)}
-
-📅 **Joined/Updated:** ${joinedDate}
-⏰ ${joinedTime}
-
-━━━━━━━━━━━━━━━━━━`
-        )
-        .setFooter({
-          text:
-            "🎭 𝗟𝗔𝗠𝗣𝗢𝗢N HOK Satire Creator Clan | Est. 2026"
-        })
-        .setThumbnail(
-          member.user.displayAvatarURL({
-            extension: "png",
-            size: 512
-          })
-        );
-
-    const banner =
-      createBannerSVG({
-        username:
-          tiktokUsername,
-
-        followers,
-
-        avatarUrl:
-          member.user.displayAvatarURL({
-            extension: "png",
-            size: 512
-          }),
-
-        displayName:
-          nickname
+      await channel.send({
+        content:
+          `<@${userId}>`,
+        embeds: [embed],
+        files: [attachment],
       });
-
-    const bannerPath =
-      path.join(
-        DATA_DIR,
-        `lampoon-${userId}-${Date.now()}.svg`
-      );
-
-    fs.writeFileSync(
-      bannerPath,
-      banner,
-      "utf8"
-    );
-
-    const attachment =
-      new AttachmentBuilder(
-        bannerPath,
-        {
-          name:
-            "lampoon-members.svg"
-        }
-      );
-
-    await channel.send({
-      embeds: [
-        embed
-      ],
-      files: [
-        attachment
-      ]
-    });
-
-    setTimeout(
-      () => {
-        try {
-          if (
-            fs.existsSync(
-              bannerPath
-            )
-          ) {
-            fs.unlinkSync(
-              bannerPath
-            );
-          }
-        } catch (error) {
-          console.error(
-            "Failed to delete temporary banner:",
-            error
-          );
-        }
-      },
-      60 * 1000
-    );
-
+    }
   } catch (error) {
     console.error(
-      "Failed to send eligibility log:",
+      "Growth announcement failed:",
       error
     );
   }
 }
 
-/* =========================================================
-   WEBSITE
-========================================================= */
+// ======================================================
+// OAUTH CONNECT
+// ======================================================
+
+app.get(
+  "/tiktok/connect",
+  (req, res) => {
+
+    const userId =
+      req.query.user_id;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .send(
+          "Missing Discord user ID."
+        );
+    }
+
+    const state =
+      createOAuthState(
+        userId
+      );
+
+    const redirectUri =
+      `${BASE_URL}/tiktok/callback`;
+
+    const params =
+      new URLSearchParams({
+        client_key:
+          TIKTOK_CLIENT_KEY,
+
+        response_type:
+          "code",
+
+        scope:
+          "user.info.basic,user.info.profile,user.info.stats",
+
+        redirect_uri:
+          redirectUri,
+
+        state,
+      });
+
+    const url =
+      `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
+
+    return res.redirect(url);
+  }
+);
+
+// ======================================================
+// OAUTH CALLBACK
+// ======================================================
+
+app.get(
+  "/tiktok/callback",
+  async (req, res) => {
+
+    try {
+
+      const {
+        code,
+        state,
+        error,
+        error_description,
+      } = req.query;
+
+      if (error) {
+        return res
+          .status(400)
+          .send(
+            `TikTok authorization failed: ${error_description || error}`
+          );
+      }
+
+      const session =
+        verifyOAuthState(
+          state
+        );
+
+      if (!session) {
+        return res
+          .status(400)
+          .send(
+            "Invalid or expired OAuth session."
+          );
+      }
+
+      if (!code) {
+        return res
+          .status(400)
+          .send(
+            "Missing TikTok authorization code."
+          );
+      }
+
+      const body =
+        new URLSearchParams();
+
+      body.append(
+        "client_key",
+        TIKTOK_CLIENT_KEY
+      );
+
+      body.append(
+        "client_secret",
+        TIKTOK_CLIENT_SECRET
+      );
+
+      body.append(
+        "code",
+        code
+      );
+
+      body.append(
+        "grant_type",
+        "authorization_code"
+      );
+
+      body.append(
+        "redirect_uri",
+        `${BASE_URL}/tiktok/callback`
+      );
+
+      const tokenResponse =
+        await fetch(
+          "https://open.tiktokapis.com/v2/oauth/token/",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/x-www-form-urlencoded",
+            },
+            body,
+          }
+        );
+
+      const tokenData =
+        await tokenResponse.json();
+
+      if (
+        !tokenResponse.ok ||
+        !tokenData.access_token
+      ) {
+        console.error(
+          "TikTok token response:",
+          tokenData
+        );
+
+        return res
+          .status(500)
+          .send(
+            "Failed to obtain TikTok access token."
+          );
+      }
+
+      const connection = {
+        access_token:
+          tokenData.access_token,
+
+        refresh_token:
+          tokenData.refresh_token,
+
+        expires_in:
+          tokenData.expires_in,
+
+        connected_at:
+          new Date().toISOString(),
+      };
+
+      saveConnection(
+        session.userId,
+        connection
+      );
+
+      const updated =
+        await updateConnectionStats(
+          session.userId
+        );
+
+      if (!updated) {
+        return res
+          .status(500)
+          .send(
+            "TikTok connected, but profile information could not be retrieved."
+          );
+      }
+
+      await processGrowthMilestone(
+        session.userId,
+        updated
+      );
+
+      saveWeeklySnapshot(
+        session.userId,
+        updated
+      );
+
+      // ----------------------------------------------
+      // ROLE ASSIGNMENT
+      // ----------------------------------------------
+
+      try {
+
+        const guild =
+          await client.guilds.fetch(
+            GUILD_ID
+          );
+
+        const member =
+          await guild.members.fetch(
+            session.userId
+          );
+
+        if (
+          updated.eligible
+        ) {
+
+          if (
+            LAMPOON_ROLE_ID &&
+            !member.roles.cache.has(
+              LAMPOON_ROLE_ID
+            )
+          ) {
+            await member.roles.add(
+              LAMPOON_ROLE_ID,
+              "Eligible TikTok Lampoon integration"
+            );
+          }
+
+          if (
+            CONTENT_CREATOR_ROLE_ID &&
+            !member.roles.cache.has(
+              CONTENT_CREATOR_ROLE_ID
+            )
+          ) {
+            await member.roles.add(
+              CONTENT_CREATOR_ROLE_ID,
+              "Eligible TikTok content creator"
+            );
+          }
+
+          if (
+            FOLLOWERS_ROLE_ID &&
+            member.roles.cache.has(
+              FOLLOWERS_ROLE_ID
+            )
+          ) {
+            await member.roles.remove(
+              FOLLOWERS_ROLE_ID,
+              "TikTok eligibility verified"
+            );
+          }
+        }
+
+      } catch (roleError) {
+
+        console.error(
+          "Role assignment error:",
+          roleError
+        );
+      }
+
+      const profileUrl =
+        updated.profile_url ||
+        getTikTokURL(
+          updated.username
+        );
+
+      return res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>TikTok Connected</title>
+<style>
+body {
+  background:#090909;
+  color:white;
+  font-family:Arial,sans-serif;
+  text-align:center;
+  padding:60px 20px;
+}
+.box {
+  max-width:650px;
+  margin:auto;
+  padding:40px;
+  border:2px solid #C48D21;
+  border-radius:25px;
+  background:#151515;
+}
+h1 {
+  color:#F8D85C;
+}
+a {
+  color:#F8D85C;
+}
+</style>
+</head>
+<body>
+<div class="box">
+<h1>🎉 TikTok Connected!</h1>
+
+<p>
+Your TikTok account has been successfully connected to Lampoon.
+</p>
+
+<p>
+<strong>@${escapeHTML(
+  updated.username
+)}</strong>
+</p>
+
+<p>
+Followers:
+<strong>${formatNumber(
+  updated.follower_count
+)}</strong>
+</p>
+
+<p>
+Your TikTok connection is now available for
+<strong>Solo Growth</strong> and the
+<strong>Weekly Leaderboard</strong>.
+</p>
+
+<p>
+<a href="${profileUrl}" target="_blank">
+View TikTok Profile
+</a>
+</p>
+
+<p>You may close this page.</p>
+</div>
+</body>
+</html>
+`);
+
+    } catch (error) {
+
+      console.error(
+        "TikTok callback error:",
+        error
+      );
+
+      return res
+        .status(500)
+        .send(
+          "TikTok connection failed."
+        );
+    }
+  }
+);
+
+// ======================================================
+// PRIVACY POLICY
+// ======================================================
+
+app.get(
+  "/privacy/",
+  (req, res) => {
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Privacy Policy</title>
+</head>
+<body>
+<h1>Privacy Policy</h1>
+
+<p>
+Lampoon Role Manager uses TikTok OAuth to connect a user's TikTok account with their Discord account.
+</p>
+
+<p>
+The integration may process TikTok profile information such as username, display name, profile picture, follower count, following count, likes and video count.
+</p>
+
+<p>
+This information is used to provide TikTok verification, Solo Growth and leaderboard functionality.
+</p>
+
+<p>
+Users may request removal of their connected TikTok information through the server administration.
+</p>
+
+</body>
+</html>
+`);
+  }
+);
+
+// ======================================================
+// TERMS
+// ======================================================
+
+app.get(
+  "/terms/",
+  (req, res) => {
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Terms of Service</title>
+</head>
+<body>
+<h1>Terms of Service</h1>
+
+<p>
+By using the Lampoon TikTok Integration, you agree to allow the application to connect your TikTok account for the features provided by the Discord server.
+</p>
+
+<p>
+The integration is provided for TikTok verification, creator growth tracking and leaderboard functionality.
+</p>
+
+</body>
+</html>
+`);
+  }
+);
+
+// ======================================================
+// HEALTH
+// ======================================================
+
+app.get(
+  "/health",
+  (req, res) => {
+    res.status(200).send("OK");
+  }
+);
+
+// ======================================================
+// HOME
+// ======================================================
 
 app.get(
   "/",
@@ -1360,1690 +3127,35 @@ app.get(
 <!DOCTYPE html>
 <html>
 <head>
-
 <meta charset="UTF-8">
-
-<title>
-LAMPOON TikTok Integration
-</title>
-
-<style>
-
-body {
-  margin: 0;
-  min-height: 100vh;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  background:
-    linear-gradient(
-      135deg,
-      #080808,
-      #202020
-    );
-
-  color: white;
-
-  font-family:
-    Arial,
-    sans-serif;
-}
-
-.box {
-  max-width: 700px;
-
-  margin: 30px;
-  padding: 40px;
-
-  border-radius: 20px;
-
-  background: #151515;
-
-  border:
-    2px solid
-    #C48D21;
-
-  box-shadow:
-    0 0 40px
-    rgba(196,141,33,.2);
-
-  text-align: center;
-}
-
-h1 {
-  color: #F8D85C;
-}
-
-a {
-  color: #F8D85C;
-  text-decoration: none;
-}
-
-.links {
-  margin-top: 30px;
-
-  display: flex;
-
-  gap: 20px;
-
-  justify-content: center;
-}
-
-</style>
-
+<title>Lampoon Role Manager</title>
 </head>
-
 <body>
+<h1>Lampoon Role Manager</h1>
 
-<div class="box">
-
-<h1>
-🎭 LAMPOON TikTok Integration
-</h1>
+<p>TikTok integration is online.</p>
 
 <p>
-This service connects TikTok accounts
-with the LAMPOON Discord creator
-verification system.
-</p>
-
-<p>
-TikTok verification is available through
-the Discord <strong>/tiktok</strong> command.
-</p>
-
-<div class="links">
-
-<a href="/terms/">
-Terms of Service
-</a>
-
 <a href="/privacy/">
 Privacy Policy
 </a>
+</p>
 
-</div>
-
-</div>
-
-</body>
-</html>
-    `);
-  }
-);
-
-/* =========================================================
-   HEALTH
-========================================================= */
-
-app.get(
-  "/health",
-  (req, res) => {
-    res.status(200).send(
-      "OK"
-    );
-  }
-);
-
-/* =========================================================
-   TERMS
-========================================================= */
-
-app.get(
-  "/terms",
-  (req, res) => {
-    res.redirect(
-      "/terms/"
-    );
-  }
-);
-
-app.get(
-  "/terms/",
-  (req, res) => {
-    res.send(`
-<!DOCTYPE html>
-<html>
-
-<head>
-
-<meta charset="UTF-8">
-
-<title>
-Terms of Service - LAMPOON
-</title>
-
-<style>
-
-body {
-  background: #111;
-  color: #eee;
-
-  font-family:
-    Arial,
-    sans-serif;
-
-  line-height: 1.7;
-
-  padding: 40px;
-}
-
-main {
-  max-width: 900px;
-  margin: auto;
-}
-
-h1,
-h2 {
-  color: #F8D85C;
-}
-
-a {
-  color: #F8D85C;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<main>
-
-<h1>
-LAMPOON TikTok Integration —
+<p>
+<a href="/terms/">
 Terms of Service
-</h1>
-
-<p>
-Last updated: September 2026
+</a>
 </p>
-
-<h2>
-1. Service
-</h2>
-
-<p>
-LAMPOON TikTok Integration is a Discord
-community verification service that allows
-eligible Discord members to connect a TikTok
-account for creator verification.
-</p>
-
-<h2>
-2. Eligibility
-</h2>
-
-<p>
-The Discord member must already have the
-configured TikTok role before using the
-verification system.
-</p>
-
-<p>
-The system checks publicly available or
-TikTok-authorized information against the
-LAMPOON community requirements.
-</p>
-
-<h2>
-3. Verification Requirements
-</h2>
-
-<ul>
-
-<li>
-TikTok username or display name contains LMP.
-</li>
-
-<li>
-Bio contains LMP Members or Lampoon Creator.
-</li>
-
-<li>
-At least 300 followers.
-</li>
-
-<li>
-At least 50 following.
-</li>
-
-<li>
-At least 1,000 likes.
-</li>
-
-<li>
-At least 15 videos.
-</li>
-
-</ul>
-
-<h2>
-4. Discord Roles
-</h2>
-
-<p>
-If the requirements are satisfied, the Discord
-bot may assign the configured LAMPOON and
-Content Creator roles and remove the configured
-Followers role.
-</p>
-
-<h2>
-5. TikTok Account
-</h2>
-
-<p>
-This integration does not post videos, modify
-videos, send messages, or modify the user's
-TikTok account.
-</p>
-
-<h2>
-6. Changes
-</h2>
-
-<p>
-The LAMPOON community may update its
-verification requirements or role configuration.
-</p>
-
-<h2>
-7. Contact
-</h2>
-
-<p>
-For questions about this service, contact the
-LAMPOON server administration.
-</p>
-
-</main>
 
 </body>
 </html>
-    `);
+`);
   }
 );
 
-/* =========================================================
-   PRIVACY
-========================================================= */
-
-app.get(
-  "/privacy",
-  (req, res) => {
-    res.redirect(
-      "/privacy/"
-    );
-  }
-);
-
-app.get(
-  "/privacy/",
-  (req, res) => {
-    res.send(`
-<!DOCTYPE html>
-<html>
-
-<head>
-
-<meta charset="UTF-8">
-
-<title>
-Privacy Policy - LAMPOON
-</title>
-
-<style>
-
-body {
-  background: #111;
-  color: #eee;
-
-  font-family:
-    Arial,
-    sans-serif;
-
-  line-height: 1.7;
-
-  padding: 40px;
-}
-
-main {
-  max-width: 900px;
-  margin: auto;
-}
-
-h1,
-h2 {
-  color: #F8D85C;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<main>
-
-<h1>
-LAMPOON TikTok Integration —
-Privacy Policy
-</h1>
-
-<p>
-Last updated: September 2026
-</p>
-
-<h2>
-1. Information Collected
-</h2>
-
-<p>
-When a user authorizes TikTok, the application
-may receive approved TikTok profile and
-statistics information including:
-</p>
-
-<ul>
-
-<li>TikTok username</li>
-<li>Display name</li>
-<li>Biography</li>
-<li>Profile avatar</li>
-<li>Follower count</li>
-<li>Following count</li>
-<li>Likes count</li>
-<li>Video count</li>
-
-</ul>
-
-<h2>
-2. Purpose
-</h2>
-
-<p>
-The information is used to determine whether
-the connected TikTok account meets LAMPOON's
-Discord creator eligibility requirements.
-</p>
-
-<h2>
-3. Discord Role Management
-</h2>
-
-<p>
-When the requirements are satisfied, the
-application may assign configured Discord roles
-and remove the configured Followers role.
-</p>
-
-<h2>
-4. TikTok Account
-</h2>
-
-<p>
-The application does not post to TikTok or
-modify the user's TikTok account.
-</p>
-
-<h2>
-5. Data Storage
-</h2>
-
-<p>
-The service stores the TikTok connection
-information needed for the Discord verification
-workflow.
-</p>
-
-<h2>
-6. Security
-</h2>
-
-<p>
-Reasonable technical measures are used to
-protect application data. Users should not
-share their TikTok credentials directly with
-this application.
-</p>
-
-<h2>
-7. Contact
-</h2>
-
-<p>
-For privacy questions, contact the LAMPOON
-server administration.
-</p>
-
-</main>
-
-</body>
-</html>
-    `);
-  }
-);
-
-/* =========================================================
-   TIKTOK CONNECT
-========================================================= */
-
-app.get(
-  "/tiktok/connect",
-  async (req, res) => {
-    try {
-      const userId =
-        String(
-          req.query.user_id ||
-          ""
-        );
-
-      if (!userId) {
-        return res
-          .status(400)
-          .send(
-            "Missing Discord user ID."
-          );
-      }
-
-      if (
-        !TIKTOK_CLIENT_KEY ||
-        !TIKTOK_CLIENT_SECRET
-      ) {
-        return res
-          .status(500)
-          .send(
-            "TikTok integration is not configured."
-          );
-      }
-
-      const member =
-        await getMember(
-          userId
-        );
-
-      if (!member) {
-        return res
-          .status(404)
-          .send(
-            "Discord member not found."
-          );
-      }
-
-      if (
-        TIKTOK_ROLE_ID &&
-        !member.roles.cache.has(
-          TIKTOK_ROLE_ID
-        )
-      ) {
-        return res
-          .status(403)
-          .send(`
-<h1>Not eligible to start</h1>
-
-<p>
-You must have the TikTok role in the
-LAMPOON Discord server before connecting
-your account.
-</p>
-        `);
-      }
-
-      const state =
-        createOAuthState(
-          userId
-        );
-
-      const redirectUri =
-        `${BASE_URL}/tiktok/callback`;
-
-      const scopes =
-        "user.info.basic,user.info.profile,user.info.stats";
-
-      const authorizeUrl =
-        "https://www.tiktok.com/v2/auth/authorize/?" +
-        new URLSearchParams({
-          client_key:
-            TIKTOK_CLIENT_KEY,
-
-          response_type:
-            "code",
-
-          scope:
-            scopes,
-
-          redirect_uri:
-            redirectUri,
-
-          state
-        }).toString();
-
-      return res.redirect(
-        authorizeUrl
-      );
-
-    } catch (error) {
-      console.error(
-        "TikTok connect error:",
-        error
-      );
-
-      return res
-        .status(500)
-        .send(
-          "Unable to start TikTok connection."
-        );
-    }
-  }
-);
-
-/* =========================================================
-   TIKTOK CALLBACK
-========================================================= */
-
-app.get(
-  "/tiktok/callback",
-  async (req, res) => {
-    try {
-      const {
-        code,
-        state,
-        error,
-        error_description
-      } = req.query;
-
-      if (error) {
-        return res
-          .status(400)
-          .send(`
-<h1>
-TikTok Authorization Cancelled
-</h1>
-
-<p>
-${escapeHtml(
-  error_description ||
-  error
-)}
-</p>
-        `);
-      }
-
-      if (
-        !code ||
-        !state
-      ) {
-        return res
-          .status(400)
-          .send(
-            "Missing TikTok authorization data."
-          );
-      }
-
-      const userId =
-        verifyOAuthState(
-          String(state)
-        );
-
-      if (!userId) {
-        return res
-          .status(400)
-          .send(`
-<h1>
-Invalid or expired session
-</h1>
-
-<p>
-Please return to Discord and start
-the TikTok verification again.
-</p>
-        `);
-      }
-
-      /* ---------------------------------------------
-         EXCHANGE CODE FOR USER TOKEN
-      --------------------------------------------- */
-
-      const tokenResponse =
-        await fetch(
-          "https://open.tiktokapis.com/v2/oauth/token/",
-          {
-            method:
-              "POST",
-
-            headers: {
-              "Content-Type":
-                "application/x-www-form-urlencoded"
-            },
-
-            body:
-              new URLSearchParams({
-                client_key:
-                  TIKTOK_CLIENT_KEY,
-
-                client_secret:
-                  TIKTOK_CLIENT_SECRET,
-
-                code:
-                  String(code),
-
-                grant_type:
-                  "authorization_code",
-
-                redirect_uri:
-                  `${BASE_URL}/tiktok/callback`
-              }).toString()
-          }
-        );
-
-      const tokenText =
-        await tokenResponse.text();
-
-      let tokenData;
-
-      try {
-        tokenData =
-          JSON.parse(
-            tokenText
-          );
-      } catch {
-        console.error(
-          "Invalid TikTok token response:",
-          tokenText
-        );
-
-        return res
-          .status(502)
-          .send(
-            "TikTok returned an invalid token response."
-          );
-      }
-
-      if (
-        !tokenResponse.ok ||
-        !tokenData.access_token
-      ) {
-        console.error(
-          "TikTok token exchange failed:",
-          tokenData
-        );
-
-        return res
-          .status(400)
-          .send(`
-<h1>
-TikTok connection failed
-</h1>
-
-<p>
-TikTok could not authorize the account.
-Please try again.
-</p>
-          `);
-      }
-
-      const accessToken =
-        tokenData.access_token;
-
-      /* ---------------------------------------------
-         GET TIKTOK USER INFO
-      --------------------------------------------- */
-
-      const fields = [
-        "open_id",
-        "union_id",
-        "avatar_url",
-        "display_name",
-        "username",
-        "bio_description",
-        "follower_count",
-        "following_count",
-        "likes_count",
-        "video_count"
-      ].join(",");
-
-      const userInfoResponse =
-        await fetch(
-          `https://open.tiktokapis.com/v2/user/info/?fields=${encodeURIComponent(fields)}`,
-          {
-            method:
-              "GET",
-
-            headers: {
-              Authorization:
-                `Bearer ${accessToken}`
-            }
-          }
-        );
-
-      const userInfoText =
-        await userInfoResponse.text();
-
-      let userInfoData;
-
-      try {
-        userInfoData =
-          JSON.parse(
-            userInfoText
-          );
-      } catch {
-        console.error(
-          "Invalid TikTok user response:",
-          userInfoText
-        );
-
-        return res
-          .status(502)
-          .send(
-            "TikTok returned invalid profile data."
-          );
-      }
-
-      if (
-        !userInfoResponse.ok ||
-        !userInfoData.data ||
-        !userInfoData.data.user
-      ) {
-        console.error(
-          "TikTok user info failed:",
-          userInfoData
-        );
-
-        return res
-          .status(400)
-          .send(`
-<h1>
-Unable to retrieve TikTok profile
-</h1>
-
-<p>
-TikTok did not return the required
-profile information.
-</p>
-          `);
-      }
-
-      const tiktokUser =
-        userInfoData.data.user;
-
-      /* ---------------------------------------------
-         CHECK REQUIREMENTS
-      --------------------------------------------- */
-
-      const requirements =
-        checkTikTokRequirements(
-          tiktokUser
-        );
-
-      const eligible =
-        isEligible(
-          tiktokUser
-        );
-
-      /* ---------------------------------------------
-         SAVE CONNECTION
-      --------------------------------------------- */
-
-      connections[userId] = {
-        open_id:
-          tiktokUser.open_id ||
-          null,
-
-        union_id:
-          tiktokUser.union_id ||
-          null,
-
-        username:
-          tiktokUser.username ||
-          "",
-
-        display_name:
-          tiktokUser.display_name ||
-          "",
-
-        bio_description:
-          tiktokUser.bio_description ||
-          "",
-
-        avatar_url:
-          tiktokUser.avatar_url ||
-          "",
-
-        follower_count:
-          numberValue(
-            tiktokUser.follower_count
-          ),
-
-        following_count:
-          numberValue(
-            tiktokUser.following_count
-          ),
-
-        likes_count:
-          numberValue(
-            tiktokUser.likes_count
-          ),
-
-        video_count:
-          numberValue(
-            tiktokUser.video_count
-          ),
-
-        access_token:
-          accessToken,
-
-        refresh_token:
-          tokenData.refresh_token ||
-          null,
-
-        expires_in:
-          tokenData.expires_in ||
-          null,
-
-        connected_at:
-          new Date().toISOString(),
-
-        eligible
-      };
-
-      saveConnections(
-        connections
-      );
-
-      /* ---------------------------------------------
-         APPLY DISCORD ROLES
-      --------------------------------------------- */
-
-      let roleResult = {
-        success:
-          false,
-
-        addedRoles:
-          [],
-
-        removedRoles:
-          []
-      };
-
-      if (eligible) {
-        roleResult =
-          await applyEligibilityRoles(
-            userId
-          );
-
-        if (
-          roleResult.success &&
-          roleResult.addedRoles.length >
-            0
-        ) {
-          await sendEligibilityLog({
-            userId,
-
-            member:
-              roleResult.member,
-
-            tiktokUser,
-
-            addedRoles:
-              roleResult.addedRoles,
-
-            removedRoles:
-              roleResult.removedRoles
-          });
-        }
-      }
-
-      /* ---------------------------------------------
-         SUCCESS PAGE
-      --------------------------------------------- */
-
-      const requirementRows = `
-<tr>
-<td>
-TikTok username/display name contains LMP
-</td>
-
-<td>
-${requirements.username ? "✅" : "❌"}
-</td>
-</tr>
-
-<tr>
-<td>
-Bio contains LMP Members or Lampoon Creator
-</td>
-
-<td>
-${requirements.bio ? "✅" : "❌"}
-</td>
-</tr>
-
-<tr>
-<td>
-Followers ≥ ${MIN_FOLLOWERS}
-</td>
-
-<td>
-${requirements.followers ? "✅" : "❌"}
-(${formatNumber(
-  requirements.values.followers
-)})
-</td>
-</tr>
-
-<tr>
-<td>
-Following ≥ ${MIN_FOLLOWING}
-</td>
-
-<td>
-${requirements.following ? "✅" : "❌"}
-(${formatNumber(
-  requirements.values.following
-)})
-</td>
-</tr>
-
-<tr>
-<td>
-Likes ≥ ${formatNumber(
-  MIN_LIKES
-)}
-</td>
-
-<td>
-${requirements.likes ? "✅" : "❌"}
-(${formatNumber(
-  requirements.values.likes
-)})
-</td>
-</tr>
-
-<tr>
-<td>
-Videos ≥ ${MIN_VIDEOS}
-</td>
-
-<td>
-${requirements.videos ? "✅" : "❌"}
-(${formatNumber(
-  requirements.values.videos
-)})
-</td>
-</tr>
-      `;
-
-      const roleMessage =
-        eligible
-          ? (
-              roleResult.addedRoles.length >
-              0
-                ? "Your Discord roles have been updated."
-                : "You are eligible. Your required Discord roles are already assigned."
-            )
-          : "You do not currently meet all LAMPOON requirements.";
-
-      return res.send(`
-<!DOCTYPE html>
-
-<html>
-
-<head>
-
-<meta charset="UTF-8">
-
-<title>
-LAMPOON TikTok Verification
-</title>
-
-<style>
-
-body {
-  margin: 0;
-
-  min-height: 100vh;
-
-  background:
-    linear-gradient(
-      135deg,
-      #070707,
-      #202020
-    );
-
-  color: white;
-
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
-
-  display: flex;
-
-  justify-content: center;
-
-  align-items: center;
-}
-
-.box {
-  width:
-    min(
-      850px,
-      calc(100% - 40px)
-    );
-
-  margin: 30px;
-
-  padding: 35px;
-
-  background: #151515;
-
-  border:
-    2px solid
-    #C48D21;
-
-  border-radius: 22px;
-
-  box-shadow:
-    0 0 50px
-    rgba(196,141,33,.25);
-}
-
-h1 {
-  color: #F8D85C;
-}
-
-.success {
-  color: #7CFF8B;
-
-  font-size: 20px;
-
-  font-weight: bold;
-}
-
-.failed {
-  color: #FF7777;
-
-  font-size: 20px;
-
-  font-weight: bold;
-}
-
-table {
-  width: 100%;
-
-  border-collapse:
-    collapse;
-
-  margin-top: 25px;
-}
-
-td {
-  border-bottom:
-    1px solid #333;
-
-  padding: 13px;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="box">
-
-<h1>
-🎭 LAMPOON TikTok Verification
-</h1>
-
-<p>
-Connected TikTok:
-<strong>
-@${escapeHtml(
-  tiktokUser.username ||
-  tiktokUser.display_name ||
-  "Unknown"
-)}
-</strong>
-</p>
-
-<p>
-${
-  eligible
-    ? '<span class="success">✅ ELIGIBLE</span>'
-    : '<span class="failed">❌ NOT ELIGIBLE</span>'
-}
-</p>
-
-<p>
-${roleMessage}
-</p>
-
-<table>
-${requirementRows}
-</table>
-
-<p>
-You may now return to Discord.
-</p>
-
-</div>
-
-</body>
-</html>
-      `);
-
-    } catch (error) {
-      console.error(
-        "TikTok callback error:",
-        error
-      );
-
-      return res
-        .status(500)
-        .send(`
-<h1>
-TikTok verification error
-</h1>
-
-<p>
-An unexpected error occurred while
-processing your TikTok verification.
-</p>
-
-<p>
-Please return to Discord and try again.
-</p>
-        `);
-    }
-  }
-);
-
-/* =========================================================
-   SLASH COMMANDS
-========================================================= */
-
-const tiktokCommand =
-  new SlashCommandBuilder()
-    .setName(
-      "tiktok"
-    )
-    .setDescription(
-      "Connect your TikTok account for LAMPOON verification."
-    );
-
-const tiktokStatusCommand =
-  new SlashCommandBuilder()
-    .setName(
-      "tiktokstatus"
-    )
-    .setDescription(
-      "View your TikTok verification status."
-    );
-
-/* =========================================================
-   DISCORD READY
-========================================================= */
-
-client.once(
-  "clientReady",
-  async () => {
-    console.log(
-      `Discord bot online as ${client.user.tag}`
-    );
-
-    console.log(
-      `Guild ID: ${GUILD_ID}`
-    );
-
-    try {
-      const guild =
-        await client.guilds.fetch(
-          GUILD_ID
-        );
-
-      const commands = [
-        tiktokCommand.toJSON(),
-        tiktokStatusCommand.toJSON()
-      ];
-
-      await guild.commands.set(
-        commands
-      );
-
-      console.log(
-        `Registered ${commands.length} slash commands in ${guild.name}.`
-      );
-
-    } catch (error) {
-      console.error(
-        "Failed to register slash commands:",
-        error
-      );
-    }
-
-    /* ---------------------------------------------
-       ROLE HIERARCHY CHECK
-    --------------------------------------------- */
-
-    try {
-      const guild =
-        await client.guilds.fetch(
-          GUILD_ID
-        );
-
-      if (!guild) {
-        console.error(
-          `❌ Guild ${GUILD_ID} could not be found.`
-        );
-
-        return;
-      }
-
-      const roles = [
-        {
-          name: "TikTok",
-          id: TIKTOK_ROLE_ID
-        },
-
-        {
-          name: "LAMPOON",
-          id: LAMPOON_ROLE_ID
-        },
-
-        {
-          name: "Content Creator",
-          id: CONTENT_CREATOR_ROLE_ID
-        },
-
-        {
-          name: "Followers",
-          id: FOLLOWERS_ROLE_ID
-        }
-      ];
-
-      for (
-        const item of roles
-      ) {
-        if (!item.id) {
-          console.log(
-            `${item.name}: NOT CONFIGURED`
-          );
-
-          continue;
-        }
-
-        const role =
-          await guild.roles.fetch(
-            item.id
-          );
-
-        if (!role) {
-          console.log(
-            `${item.name}: ROLE NOT FOUND`
-          );
-
-          continue;
-        }
-
-        console.log(
-          `${item.name}: ${role.name} (${role.id}) editable=${role.editable}`
-        );
-      }
-
-    } catch (error) {
-      console.error(
-        "Role hierarchy check failed:",
-        error
-      );
-    }
-  }
-);
-
-/* =========================================================
-   SLASH COMMAND INTERACTIONS
-========================================================= */
-
-client.on(
-  "interactionCreate",
-  async interaction => {
-
-    if (
-      !interaction.isChatInputCommand()
-    ) {
-      return;
-    }
-
-    /* ---------------------------------------------
-       /tiktok
-    --------------------------------------------- */
-
-    if (
-      interaction.commandName ===
-      "tiktok"
-    ) {
-      try {
-        const member =
-          await getMember(
-            interaction.user.id
-          );
-
-        if (!member) {
-          return interaction.reply({
-            content:
-              "❌ I could not find you in the LAMPOON server.",
-
-            ephemeral:
-              true
-          });
-        }
-
-        if (
-          TIKTOK_ROLE_ID &&
-          !member.roles.cache.has(
-            TIKTOK_ROLE_ID
-          )
-        ) {
-          return interaction.reply({
-            content:
-              "❌ You need the **TikTok** role before you can connect your TikTok account.",
-
-            ephemeral:
-              true
-          });
-        }
-
-        const connectUrl =
-          `${BASE_URL}/tiktok/connect?user_id=${encodeURIComponent(
-            interaction.user.id
-          )}`;
-
-        const embed =
-          new EmbedBuilder()
-            .setColor(
-              "#C48D21"
-            )
-            .setTitle(
-              "🎭 LAMPOON TikTok Verification"
-            )
-            .setDescription(
-`Connect your TikTok account to check your eligibility for the **LAMPOON** creator system.
-
-**Requirements**
-
-> • TikTok username/display name contains **LMP**
-> • Bio contains **LMP Members** or **Lampoon Creator**
-> • **300+** followers
-> • **50+** following
-> • **1,000+** likes
-> • **15+** videos
-
-No maximum limits are used.
-
-Click the button below to connect your TikTok account.`
-            )
-            .setFooter({
-              text:
-                "LAMPOON HOK Satire Creator Clan | Est. 2026"
-            });
-
-        const row =
-          new ActionRowBuilder()
-            .addComponents(
-              new ButtonBuilder()
-                .setLabel(
-                  "Connect TikTok"
-                )
-                .setStyle(
-                  ButtonStyle.Link
-                )
-                .setURL(
-                  connectUrl
-                )
-            );
-
-        return interaction.reply({
-          embeds: [
-            embed
-          ],
-
-          components: [
-            row
-          ],
-
-          ephemeral:
-            true
-        });
-
-      } catch (error) {
-        console.error(
-          "/tiktok command error:",
-          error
-        );
-
-        if (
-          !interaction.replied
-        ) {
-          return interaction.reply({
-            content:
-              "❌ An error occurred while creating the TikTok connection.",
-
-            ephemeral:
-              true
-          });
-        }
-      }
-    }
-
-    /* ---------------------------------------------
-       /tiktokstatus
-    --------------------------------------------- */
-
-    if (
-      interaction.commandName ===
-      "tiktokstatus"
-    ) {
-      try {
-        const saved =
-          connections[
-            interaction.user.id
-          ];
-
-        if (!saved) {
-          return interaction.reply({
-            content:
-              "❌ You do not have a connected TikTok account yet. Use `/tiktok` first.",
-
-            ephemeral:
-              true
-          });
-        }
-
-        const requirements =
-          checkTikTokRequirements({
-            username:
-              saved.username,
-
-            display_name:
-              saved.display_name,
-
-            bio_description:
-              saved.bio_description,
-
-            follower_count:
-              saved.follower_count,
-
-            following_count:
-              saved.following_count,
-
-            likes_count:
-              saved.likes_count,
-
-            video_count:
-              saved.video_count
-          });
-
-        const eligible =
-          isEligible({
-            username:
-              saved.username,
-
-            display_name:
-              saved.display_name,
-
-            bio_description:
-              saved.bio_description,
-
-            follower_count:
-              saved.follower_count,
-
-            following_count:
-              saved.following_count,
-
-            likes_count:
-              saved.likes_count,
-
-            video_count:
-              saved.video_count
-          });
-
-        const status =
-          eligible
-            ? "✅ ELIGIBLE"
-            : "❌ NOT ELIGIBLE";
-
-        const embed =
-          new EmbedBuilder()
-            .setColor(
-              eligible
-                ? "#57F287"
-                : "#ED4245"
-            )
-            .setTitle(
-              "🎭 TikTok Verification Status"
-            )
-            .setDescription(
-`**TikTok:** @${escapeHtml(
-  saved.username ||
-  saved.display_name ||
-  "Unknown"
-)}
-
-**Status:** ${status}`
-            )
-            .addFields(
-              {
-                name:
-                  "LMP Username / Display Name",
-
-                value:
-                  requirements.username
-                    ? "✅ Passed"
-                    : "❌ Failed",
-
-                inline:
-                  true
-              },
-
-              {
-                name:
-                  "Bio",
-
-                value:
-                  requirements.bio
-                    ? "✅ Passed"
-                    : "❌ Failed",
-
-                inline:
-                  true
-              },
-
-              {
-                name:
-                  "Followers",
-
-                value:
-                  `${requirements.followers ? "✅" : "❌"} ${formatNumber(saved.follower_count)} / ${formatNumber(MIN_FOLLOWERS)}`,
-
-                inline:
-                  true
-              },
-
-              {
-                name:
-                  "Following",
-
-                value:
-                  `${requirements.following ? "✅" : "❌"} ${formatNumber(saved.following_count)} / ${formatNumber(MIN_FOLLOWING)}`,
-
-                inline:
-                  true
-              },
-
-              {
-                name:
-                  "Likes",
-
-                value:
-                  `${requirements.likes ? "✅" : "❌"} ${formatNumber(saved.likes_count)} / ${formatNumber(MIN_LIKES)}`,
-
-                inline:
-                  true
-              },
-
-              {
-                name:
-                  "Videos",
-
-                value:
-                  `${requirements.videos ? "✅" : "❌"} ${formatNumber(saved.video_count)} / ${formatNumber(MIN_VIDEOS)}`,
-
-                inline:
-                  true
-              }
-            )
-            .setFooter({
-              text:
-                "LAMPOON TikTok Integration"
-            });
-
-        return interaction.reply({
-          embeds: [
-            embed
-          ],
-
-          ephemeral:
-            true
-        });
-
-      } catch (error) {
-        console.error(
-          "/tiktokstatus command error:",
-          error
-        );
-
-        if (
-          !interaction.replied
-        ) {
-          return interaction.reply({
-            content:
-              "❌ Unable to retrieve your TikTok status.",
-
-            ephemeral:
-              true
-          });
-        }
-      }
-    }
-  }
-);
-
-/* =========================================================
-   WEB SERVER
-========================================================= */
+// ======================================================
+// START WEB SERVER
+// ======================================================
 
 app.listen(
   PORT,
@@ -3052,88 +3164,65 @@ app.listen(
     console.log(
       `🌐 Web server running on port ${PORT}`
     );
-
-    console.log(
-      `🌐 Base URL: ${BASE_URL}`
-    );
-
-    console.log(
-      `❤️ Health: ${BASE_URL}/health`
-    );
-
-    console.log(
-      `📄 Terms: ${BASE_URL}/terms/`
-    );
-
-    console.log(
-      `🔐 Privacy: ${BASE_URL}/privacy/`
-    );
-
-    console.log(
-      `🎵 TikTok callback: ${BASE_URL}/tiktok/callback`
-    );
-
-    console.log(
-      `🔎 TikTok website verification: ${BASE_URL}/${WEB_VERIFICATION_FILE}`
-    );
-
-    console.log(
-      `🔎 TikTok terms verification: ${BASE_URL}/terms/${encodeURIComponent(TERMS_VERIFICATION_FILE)}`
-    );
   }
 );
 
-/* =========================================================
-   DISCORD LOGIN
-========================================================= */
+// ======================================================
+// DISCORD LOGIN
+// ======================================================
 
-console.log("🔄 Starting Discord login...");
 console.log(
-  "🔑 DISCORD_TOKEN configured:",
+  "Starting Discord login..."
+);
+
+console.log(
+  "DISCORD_TOKEN configured:",
   Boolean(DISCORD_TOKEN)
 );
+
 console.log(
-  "🆔 DISCORD_CLIENT_ID:",
-  DISCORD_CLIENT_ID || "MISSING"
+  "DISCORD_CLIENT_ID:",
+  DISCORD_CLIENT_ID
 );
+
 console.log(
-  "🏠 GUILD_ID:",
+  "GUILD_ID:",
   GUILD_ID
 );
 
 if (!DISCORD_TOKEN) {
   console.error(
-    "❌ DISCORD_TOKEN is missing from Render Environment."
-  );
-} else {
-  console.log(
-    "🔐 Sending login request to Discord..."
+    "❌ DISCORD_TOKEN is missing."
   );
 
-  const loginTimeout = setTimeout(() => {
-    console.error(
-      "⏰ Discord login has not completed after 30 seconds."
-    );
-    console.error(
-      "⚠️ The bot is not reaching the Discord READY event."
-    );
-  }, 30000);
-
-  client
-    .login(DISCORD_TOKEN)
-    .then(() => {
-      clearTimeout(loginTimeout);
-
-      console.log(
-        "✅ Discord login requested successfully."
-      );
-    })
-    .catch(error => {
-      clearTimeout(loginTimeout);
-
-      console.error(
-        "❌ Discord login failed:"
-      );
-      console.error(error);
-    });
+  process.exit(1);
 }
+
+client
+  .login(DISCORD_TOKEN)
+  .then(() => {
+    console.log(
+      "Discord login requested successfully."
+    );
+  })
+  .catch(error => {
+    console.error(
+      "❌ Discord login failed:",
+      error
+    );
+  });
+
+setTimeout(() => {
+
+  if (!client.isReady()) {
+
+    console.error(
+      "❌ Discord login has not completed after 30 seconds."
+    );
+
+    console.error(
+      "The bot is not reaching the Discord READY event."
+    );
+  }
+
+}, 30000);
