@@ -73,8 +73,7 @@ const LMP_TAG_CHANNEL_ID =
 // TIKTOK EMOJI
 // ======================================================
 
-const TIKTOK_EMOJI =
-  "<:tiktok:1343657442881568778>";
+const TIKTOK_EMOJI = "<:Tiktok:1542438653094268969>";
 
 // ======================================================
 // TIKTOK REQUIREMENTS
