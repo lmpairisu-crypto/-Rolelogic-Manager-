@@ -3075,6 +3075,22 @@ Users may request removal of their connected TikTok information through the serv
 );
 
 // ======================================================
+// TIKTOK URL VERIFICATION
+// ======================================================
+
+app.get(
+  "/privacy/tiktokF1wnWfmAuYM258CvUML5j5CeLmhzWJFn.txt",
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "tiktokF1wnWfmAuYM258CvUML5j5CeLmhzWJFn.txt"
+      )
+    );
+  }
+);
+
+// ======================================================
 // TERMS
 // ======================================================
 
