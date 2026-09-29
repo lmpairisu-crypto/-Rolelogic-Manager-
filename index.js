@@ -3215,6 +3215,22 @@ app.get(
 );
 
 // ======================================================
+// TIKTOK URL PREFIX VERIFICATION
+// ======================================================
+
+app.get(
+  "/tiktokbwBm0PcPeI4926nUqWYU8VHcY41Q37Sb.txt",
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "tiktokbwBm0PcPeI4926nUqWYU8VHcY41Q37Sb.txt"
+      )
+    );
+  }
+);
+
+// ======================================================
 // TERMS
 // ======================================================
 
