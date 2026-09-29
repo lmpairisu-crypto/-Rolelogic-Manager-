@@ -3043,30 +3043,139 @@ app.get(
   (req, res) => {
     res.send(`
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Privacy Policy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy • Lampoon Role Manager</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0b0b0b;
+  color: #f5f5f5;
+  line-height: 1.7;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 40px 22px;
+}
+
+.card {
+  background: #151515;
+  border: 1px solid #3b2a0d;
+  border-radius: 14px;
+  padding: 30px;
+}
+
+h1 {
+  color: #F8D85C;
+}
+
+h2 {
+  color: #D9A52E;
+  margin-top: 30px;
+}
+
+a {
+  color: #F8D85C;
+}
+
+.footer {
+  margin-top: 35px;
+  color: #999;
+  font-size: 14px;
+}
+</style>
 </head>
+
 <body>
+<div class="container">
+<div class="card">
+
 <h1>Privacy Policy</h1>
 
 <p>
-Lampoon Role Manager uses TikTok OAuth to connect a user's TikTok account with their Discord account.
+This Privacy Policy explains how Lampoon Role Manager handles information
+when users connect their TikTok account through the TikTok integration.
+</p>
+
+<h2>Information We Process</h2>
+
+<p>
+When a user connects TikTok, the application may process information provided
+through the TikTok API, including:
+</p>
+
+<ul>
+<li>TikTok username</li>
+<li>TikTok display name</li>
+<li>Profile picture</li>
+<li>Follower count</li>
+<li>Following count</li>
+<li>Likes count</li>
+<li>Video count</li>
+<li>TikTok profile URL</li>
+</ul>
+
+<h2>How Information Is Used</h2>
+
+<p>
+The information is used to provide TikTok verification, Discord role
+management, creator recognition, Solo Growth features and leaderboard
+functionality within the Lampoon Discord server.
+</p>
+
+<h2>Discord Account Connection</h2>
+
+<p>
+TikTok information is associated with the Discord account that initiates
+the TikTok connection process.
+</p>
+
+<h2>Data Storage</h2>
+
+<p>
+Connection and statistics information may be stored by the application
+in order to provide its features and maintain the user's TikTok connection.
+</p>
+
+<h2>Data Removal</h2>
+
+<p>
+Users may request removal of their connected TikTok information through
+the Lampoon server administration.
+</p>
+
+<h2>Third-Party Service</h2>
+
+<p>
+TikTok authentication and data access are provided through TikTok's
+official developer platform. TikTok's own privacy policies and terms
+also apply to the user's use of TikTok.
+</p>
+
+<h2>Changes to This Policy</h2>
+
+<p>
+This Privacy Policy may be updated when the functionality of the
+TikTok integration changes.
+</p>
+
+<p class="footer">
+Lampoon Role Manager<br>
+TikTok Integration
 </p>
 
 <p>
-The integration may process TikTok profile information such as username, display name, profile picture, follower count, following count, likes and video count.
+<a href="/">← Back to Website</a>
 </p>
 
-<p>
-This information is used to provide TikTok verification, Solo Growth and leaderboard functionality.
-</p>
-
-<p>
-Users may request removal of their connected TikTok information through the server administration.
-</p>
-
+</div>
+</div>
 </body>
 </html>
 `);
@@ -3074,16 +3183,16 @@ Users may request removal of their connected TikTok information through the serv
 );
 
 // ======================================================
-// TIKTOK URL VERIFICATION
+// TIKTOK PRIVACY VERIFICATION
 // ======================================================
 
 app.get(
-  "/privacy/tiktokF1wnWfmAuYM258CvUML5j5CeLmhzWJFn.txt",
+  "/privacy/tiktokeR5qBFSwFpGIgh2ybpFUFK4uQL3J0rTg.txt",
   (req, res) => {
     res.sendFile(
       path.join(
         __dirname,
-        "tiktokF1wnWfmAuYM258CvUML5j5CeLmhzWJFn.txt"
+        "tiktokeR5qBFSwFpGIgh2ybpFUFK4uQL3J0rTg.txt"
       )
     );
   }
@@ -3098,25 +3207,163 @@ app.get(
   (req, res) => {
     res.send(`
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Terms of Service</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service • Lampoon Role Manager</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0b0b0b;
+  color: #f5f5f5;
+  line-height: 1.7;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 40px 22px;
+}
+
+.card {
+  background: #151515;
+  border: 1px solid #3b2a0d;
+  border-radius: 14px;
+  padding: 30px;
+}
+
+h1 {
+  color: #F8D85C;
+}
+
+h2 {
+  color: #D9A52E;
+  margin-top: 30px;
+}
+
+a {
+  color: #F8D85C;
+}
+
+.footer {
+  margin-top: 35px;
+  color: #999;
+  font-size: 14px;
+}
+</style>
 </head>
+
 <body>
+<div class="container">
+<div class="card">
+
 <h1>Terms of Service</h1>
 
 <p>
-By using the Lampoon TikTok Integration, you agree to allow the application to connect your TikTok account for the features provided by the Discord server.
+These Terms of Service govern the use of the Lampoon Role Manager
+TikTok integration.
+</p>
+
+<h2>Use of the Service</h2>
+
+<p>
+The integration allows eligible Discord members to connect a TikTok
+account and use TikTok-related verification, creator recognition,
+growth and leaderboard features.
+</p>
+
+<h2>TikTok Authorization</h2>
+
+<p>
+By connecting TikTok, you authorize the application to access the
+TikTok information permitted by the TikTok authorization process.
+</p>
+
+<h2>Eligibility</h2>
+
+<p>
+Discord roles and creator recognition may depend on requirements
+configured by the Lampoon server. Meeting or failing to meet those
+requirements may affect role assignment.
+</p>
+
+<h2>Accurate Information</h2>
+
+<p>
+Users should connect their own TikTok account and provide accurate
+information during the authorization process.
+</p>
+
+<h2>Service Changes</h2>
+
+<p>
+The Lampoon Role Manager functionality may be modified, suspended
+or discontinued at any time.
+</p>
+
+<h2>Third-Party Services</h2>
+
+<p>
+TikTok and Discord are third-party services. Their respective terms
+and policies also apply when using their platforms.
+</p>
+
+<h2>Data Removal</h2>
+
+<p>
+Users may request removal of their connected TikTok information
+through the Lampoon server administration.
+</p>
+
+<p class="footer">
+Lampoon Role Manager<br>
+TikTok Integration
 </p>
 
 <p>
-The integration is provided for TikTok verification, creator growth tracking and leaderboard functionality.
+<a href="/">← Back to Website</a>
 </p>
 
+</div>
+</div>
 </body>
 </html>
 `);
+  }
+);
+
+// ======================================================
+// TIKTOK TERMS VERIFICATION
+// ======================================================
+
+app.get(
+  "/terms/tiktokY8vNh8YvhkupafBSKfE2rKBs14so1BLW.txt",
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "tiktokY8vNh8YvhkupafBSKfE2rKBs14so1BLW.txt"
+      )
+    );
+  }
+);
+
+// ======================================================
+// TIKTOK CALLBACK VERIFICATION
+// ======================================================
+
+app.get(
+  "/tiktok/callback/tiktokF1wnWfmAuYM258CvUML5j5CeLmhzWJFn.txt",
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "tiktokF1wnWfmAuYM258CvUML5j5CeLmhzWJFn.txt"
+      )
+    );
   }
 );
 
@@ -3140,27 +3387,145 @@ app.get(
   (req, res) => {
     res.send(`
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lampoon Role Manager</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #080808;
+  color: #f5f5f5;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 55px 22px;
+}
+
+.hero {
+  background: linear-gradient(145deg, #151515, #0d0d0d);
+  border: 1px solid #3b2a0d;
+  border-radius: 18px;
+  padding: 45px 30px;
+  text-align: center;
+}
+
+h1 {
+  color: #F8D85C;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: #bbb;
+  font-size: 18px;
+}
+
+.buttons {
+  margin-top: 30px;
+}
+
+.button {
+  display: inline-block;
+  margin: 8px;
+  padding: 13px 22px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  background: #C48D21;
+  color: #111;
+}
+
+.button:hover {
+  background: #F8D85C;
+}
+
+.section {
+  margin-top: 25px;
+  background: #151515;
+  border-radius: 14px;
+  padding: 25px;
+  border: 1px solid #292929;
+}
+
+h2 {
+  color: #D9A52E;
+}
+
+.footer {
+  margin-top: 35px;
+  text-align: center;
+  color: #777;
+  font-size: 14px;
+}
+</style>
 </head>
+
 <body>
-<h1>Lampoon Role Manager</h1>
 
-<p>TikTok integration is online.</p>
+<div class="container">
 
-<p>
-<a href="/privacy/">
+<div class="hero">
+
+<h1>🏠 Lampoon Role Manager</h1>
+
+<p class="subtitle">
+TikTok Integration & Creator Management
+</p>
+
+<div class="buttons">
+
+<a class="button" href="/privacy/">
 Privacy Policy
 </a>
+
+<a class="button" href="/terms/">
+Terms of Service
+</a>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<h2>TikTok Integration</h2>
+
+<p>
+Lampoon Role Manager connects eligible TikTok creators with
+the Lampoon Discord community.
 </p>
 
 <p>
-<a href="/terms/">
-Terms of Service
-</a>
+The integration can provide TikTok verification, creator role
+management, growth tracking and leaderboard features.
 </p>
+
+</div>
+
+<div class="section">
+
+<h2>Creator Features</h2>
+
+<ul>
+<li>TikTok account connection</li>
+<li>Creator verification</li>
+<li>Discord role management</li>
+<li>Solo Growth tracking</li>
+<li>TikTok leaderboard features</li>
+</ul>
+
+</div>
+
+<div class="footer">
+Lampoon Role Manager • TikTok Integration
+</div>
+
+</div>
 
 </body>
 </html>
