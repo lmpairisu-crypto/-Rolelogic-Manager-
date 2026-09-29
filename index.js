@@ -3199,6 +3199,22 @@ app.get(
 );
 
 // ======================================================
+// TIKTOK MAIN WEBSITE VERIFICATION
+// ======================================================
+
+app.get(
+  "/tiktok3AHMvvrK3J3QvvDZiQC0GaU1JOy9mAvN.txt",
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "tiktok3AHMvvrK3J3QvvDZiQC0GaU1JOy9mAvN.txt"
+      )
+    );
+  }
+);
+
+// ======================================================
 // TERMS
 // ======================================================
 
