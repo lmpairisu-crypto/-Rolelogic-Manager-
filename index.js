@@ -2105,7 +2105,7 @@ client.on(
 // ======================================================
 
 client.once(
-  "ready",
+  "clientReady",
   async () => {
     runtimeState.discordReady = true;
     runtimeState.lastDiscordReadyAt =
