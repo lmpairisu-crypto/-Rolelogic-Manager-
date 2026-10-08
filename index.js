@@ -3363,10 +3363,10 @@ app.get(
 // ======================================================
 
 app.get(
-  "/tiktok/callback/tiktokpESZWefP6jojxdo1nnnQdgv0G2mFXR8d.txt",
+  "/tiktok/callback/tiktokIXb6u67LxsJlobwqN6dGO3I35r1rH4Jz.txt",
   (req, res) => {
     res.type("text/plain").send(
-      "tiktok-developers-site-verification=pESZWefP6jojxdo1nnnQdgv0G2mFXR8d"
+      "tiktok-developers-site-verification=IXb6u67LxsJlobwqN6dGO3I35r1rH4Jz"
     );
   }
 );
@@ -3475,7 +3475,7 @@ h2 {
 
 <div class="hero">
 
-<h1>🏠 Lampoon Role Manager</h1>
+<h1>🎭 Lampoon Role Manager</h1>
 
 <p class="subtitle">
 TikTok Integration & Creator Management
