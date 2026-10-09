@@ -3547,62 +3547,71 @@ app.listen(
   }
 );
 
-// ======================================================
-// DISCORD LOGIN
-// ======================================================
 
-console.log(
-  "Starting Discord login..."
-);
+ // ======================================================
+ // DISCORD LOGIN DIAGNOSTICS
+ // ======================================================
 
-console.log(
-  "DISCORD_TOKEN configured:",
-  Boolean(DISCORD_TOKEN)
-);
-
-console.log(
-  "DISCORD_CLIENT_ID:",
-  DISCORD_CLIENT_ID
-);
-
-console.log(
-  "GUILD_ID:",
-  GUILD_ID
-);
+console.log("Starting Discord login...");
+console.log("DISCORD_TOKEN configured:", Boolean(DISCORD_TOKEN));
+console.log("DISCORD_CLIENT_ID:", DISCORD_CLIENT_ID);
+console.log("GUILD_ID:", GUILD_ID);
 
 if (!DISCORD_TOKEN) {
-  console.error(
-    "❌ DISCORD_TOKEN is missing."
-  );
-
+  console.error("❌ DISCORD_TOKEN is missing.");
   process.exit(1);
 }
 
-client
-  .login(DISCORD_TOKEN)
-  .then(() => {
-    console.log(
-      "Discord login requested successfully."
-    );
-  })
-  .catch(error => {
-    console.error(
-      "❌ Discord login failed:",
-      error
-    );
-  });
-
-setTimeout(() => {
-
-  if (!client.isReady()) {
-
-    console.error(
-      "❌ Discord login has not completed after 30 seconds."
-    );
-
-    console.error(
-      "The bot is not reaching the Discord READY event."
-    );
+// Log Discord Gateway debug messages relevant to connection failures.
+client.on("debug", (message) => {
+  if (/error|fail|timeout|gateway|identify|heartbeat|connect|close|resume/i.test(message)) {
+    console.log("🔎 Discord Gateway:", message);
   }
+});
 
+client.on("warn", (message) => {
+  console.warn("⚠️ Discord warning:", message);
+});
+
+client.on("error", (error) => {
+  console.error("❌ Discord client error:", error.message);
+  console.error("Error code:", error.code ?? "No code");
+});
+
+client.on("shardError", (error, shardId) => {
+  console.error(`❌ Shard ${shardId} error:`, error.message);
+  console.error("Error code:", error.code ?? "No code");
+});
+
+client.on("shardDisconnect", (event, shardId) => {
+  console.error(`🔌 Shard ${shardId} disconnected.`);
+  console.error("Disconnect code:", event?.code);
+  console.error("Disconnect reason:", event?.reason || "Not provided");
+});
+
+client.once("ready", (readyClient) => {
+  console.log(`✅ Discord READY: ${readyClient.user.tag}`);
+  console.log("Discord user ID:", readyClient.user.id);
+  console.log("Connected guild count:", readyClient.guilds.cache.size);
+});
+
+// Keep exactly ONE client.login() call in your entire index.js.
+const loginTimeout = setTimeout(() => {
+  if (!client.isReady()) {
+    console.error("⏰ Discord is still not READY after 30 seconds.");
+    console.error("WebSocket status:", client.ws?.status ?? "Unknown");
+    console.error("Destroyed:", client.destroyed ?? "Unknown");
+  }
 }, 30000);
+
+client.login(DISCORD_TOKEN)
+  .then(() => {
+    console.log("✅ Discord login promise resolved.");
+    console.log("Client ready:", client.isReady());
+  })
+  .catch((error) => {
+    console.error("❌ Discord login rejected.");
+    console.error("Error name:", error.name);
+    console.error("Error code:", error.code ?? "No code");
+    console.error("Error message:", error.message);
+  });
