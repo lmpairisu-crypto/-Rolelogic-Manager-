@@ -3185,9 +3185,12 @@ TikTok Integration
 app.get(
   "/privacy/tiktokjlnfHVOZcRtMRKFN4djesAMyvWACqLj5.txt",
   (req, res) => {
-    res.type("text/plain").send(
-      "tiktok-developers-site-verification=jlnfHVOZcRtMRKFN4djesAMyvWACqLj5"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=jlnfHVOZcRtMRKFN4djesAMyvWACqLj5"
+      );
   }
 );
 
@@ -3198,9 +3201,12 @@ app.get(
 app.get(
   "/tiktokHTOB7TYgWaO6OxEyLzKthXMkvlUebN8O.txt",
   (req, res) => {
-    res.type("text/plain").send(
-      "tiktok-developers-site-verification=HTOB7TYgWaO6OxEyLzKthXMkvlUebN8O"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=HTOB7TYgWaO6OxEyLzKthXMkvlUebN8O"
+      );
   }
 );
 
@@ -3348,9 +3354,12 @@ TikTok Integration
 app.get(
   "/terms/tiktokvvQWwb5YN2FYhQ6XSqbBGpvyyQdEFuJf.txt",
   (req, res) => {
-    res.type("text/plain").send(
-      "tiktok-developers-site-verification=vvQWwb5YN2FYhQ6XSqbBGpvyyQdEFuJf"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=vvQWwb5YN2FYhQ6XSqbBGpvyyQdEFuJf"
+      );
   }
 );
 
@@ -3361,9 +3370,12 @@ app.get(
 app.get(
   "/tiktok/callback/tiktokIXb6u67LxsJlobwqN6dGO3I35r1rH4Jz.txt",
   (req, res) => {
-    res.type("text/plain").send(
-      "tiktok-developers-site-verification=IXb6u67LxsJlobwqN6dGO3I35r1rH4Jz"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=IXb6u67LxsJlobwqN6dGO3I35r1rH4Jz"
+      );
   }
 );
 
