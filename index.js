@@ -1893,73 +1893,69 @@ const commands = [
 // DISCORD DEBUG
 // ======================================================
 
-client.on(
-  "debug",
-  message => {
-    console.log(
-      "🔎 Discord Debug:",
+client.on("debug", (message) => {
+  // Filter for useful Gateway and connection diagnostics.
+  if (
+    /error|fail|timeout|429|identify|gateway|heartbeat|connect|close|resume/i.test(
       message
-    );
+    )
+  ) {
+    console.log("🔎 Discord Debug:", message);
   }
-);
+});
 
-client.on(
-  "warn",
-  message => {
-    console.warn(
-      "⚠️ Discord Warning:",
-      message
-    );
-  }
-);
+client.on("warn", (message) => {
+  console.warn("⚠️ Discord Warning:", message);
+});
 
-client.on(
-  "error",
-  error => {
-    console.error(
-      "❌ Discord Client Error:",
-      error
-    );
-  }
-);
+client.on("error", (error) => {
+  console.error("❌ Discord Client Error:", error);
+});
 
-client.on(
-  "shardError",
-  error => {
-    console.error(
-      "❌ Discord Shard Error:",
-      error
-    );
-  }
-);
+client.on("shardError", (error, shardId) => {
+  console.error(`❌ Discord Shard ${shardId} Error:`, error);
+});
 
-client.on(
-  "shardReady",
-  shardId => {
-    console.log(
-      `🟢 Discord Shard ${shardId} ready.`
-    );
-  }
-);
+client.on("shardReady", (shardId) => {
+  console.log(`🟢 Discord Shard ${shardId} ready.`);
+});
 
-client.on(
-  "shardReconnecting",
-  shardId => {
-    console.log(
-      `🔄 Discord Shard ${shardId} reconnecting.`
-    );
-  }
-);
+client.on("shardReconnecting", (shardId) => {
+  console.warn(`🔄 Discord Shard ${shardId} reconnecting.`);
+});
 
-client.on(
-  "shardDisconnect",
-  (event, shardId) => {
-    console.error(
-      `🔌 Discord Shard ${shardId} disconnected:`,
-      event
-    );
-  }
-);
+client.on("shardDisconnect", (event, shardId) => {
+  console.error(`🔌 Discord Shard ${shardId} disconnected.`);
+  console.error("Disconnect code:", event?.code);
+  console.error("Disconnect reason:", event?.reason || "No reason provided");
+  console.error("Was clean:", event?.wasClean);
+});
+
+client.on("shardResume", (shardId, replayedEvents) => {
+  console.log(
+    `♻️ Discord Shard ${shardId} resumed. Replayed events: ${replayedEvents}`
+  );
+});
+
+// ======================================================
+// DISCORD READY STATUS
+// ======================================================
+
+client.once("ready", (readyClient) => {
+  console.log(`✅ Discord READY: ${readyClient.user.tag}`);
+  console.log(`🆔 Discord User ID: ${readyClient.user.id}`);
+  console.log(`🌐 Connected Guilds: ${readyClient.guilds.cache.size}`);
+});
+
+// ======================================================
+// DISCORD LOGIN FAILURE
+// ======================================================
+
+// Keep your existing client.login(DISCORD_TOKEN) call.
+// Attach a catch to it to log login failures.
+client.login(DISCORD_TOKEN).catch((error) => {
+  console.error("❌ Discord login failed:", error);
+});
 
 // ======================================================
 // DISCORD READY
