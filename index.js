@@ -3182,14 +3182,19 @@ TikTok Integration
 // TIKTOK PRIVACY VERIFICATION
 // ======================================================
 
+
 app.get(
   "/privacy/tiktokQ4LN9p5PLTjbMhuIQL55c6e6hUYQXuRA.txt",
   (req, res) => {
-    res.status(200).type("text/plain").send(
-      "tiktok-developers-site-verification=Q4LN9p5PLTjbMhuIQL55c6e6hUYQXuRA"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=Q4LN9p5PLTjbMhuIQL55c6e6hUYQXuRA"
+      );
   }
 );
+
 
 // ======================================================
 // TIKTOK MAIN WEBSITE VERIFICATION
@@ -3198,9 +3203,12 @@ app.get(
 app.get(
   "/tiktokqwbP2ff89Ir4Xbe5sw3lru4K2bBQImUs.txt",
   (req, res) => {
-    res.status(200).type("text/plain").send(
-      "tiktok-developers-site-verification=qwbP2ff89Ir4Xbe5sw3lru4K2bBQImUs"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=qwbP2ff89Ir4Xbe5sw3lru4K2bBQImUs"
+      );
   }
 );
 
@@ -3358,14 +3366,19 @@ app.get(
 // TIKTOK TERMS VERIFICATION
 // ======================================================
 
+
 app.get(
   "/terms/tiktokNIl1SYpNbDRmzcOBhiMScyHvJVYEPttg.txt",
   (req, res) => {
-    res.status(200).type("text/plain").send(
-      "tiktok-developers-site-verification=NIl1SYpNbDRmzcOBhiMScyHvJVYEPttg"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=NIl1SYpNbDRmzcOBhiMScyHvJVYEPttg"
+      );
   }
 );
+
 
 // ======================================================
 // TIKTOK CALLBACK VERIFICATION
@@ -3374,9 +3387,12 @@ app.get(
 app.get(
   "/tiktok/callback/tiktokLzcHFDUthAgAaWC16LVdJvP2uH0RAEJn.txt",
   (req, res) => {
-    res.status(200).type("text/plain").send(
-      "tiktok-developers-site-verification=LzcHFDUthAgAaWC16LVdJvP2uH0RAEJn"
-    );
+    res
+      .status(200)
+      .type("text/plain")
+      .send(
+        "tiktok-developers-site-verification=LzcHFDUthAgAaWC16LVdJvP2uH0RAEJn"
+      );
   }
 );
 
