@@ -3704,10 +3704,15 @@ client.on("shardError", (error, shardId) => {
   console.error("Error code:", error.code ?? "No code");
 });
 
+
 client.on("shardDisconnect", (event, shardId) => {
   console.error(`🔌 Shard ${shardId} disconnected.`);
-  console.error("Disconnect code:", event?.code);
-  console.error("Disconnect reason:", event?.reason || "Not provided");
+  console.error("Disconnect code:", event?.code ?? "Unknown");
+  console.error(
+    "Disconnect reason:",
+    event?.reason?.toString() || "Not provided"
+  );
+  console.error("Was clean:", event?.wasClean ?? "Unknown");
 });
 
 client.once("ready", (readyClient) => {
