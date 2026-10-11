@@ -3668,7 +3668,6 @@ app.listen(
   }
 );
 
-
  // ======================================================
  // DISCORD LOGIN DIAGNOSTICS
  // ======================================================
@@ -3722,12 +3721,14 @@ client.once("ready", (readyClient) => {
 });
 
 // Keep exactly ONE client.login() call in your entire index.js.
+
 const loginTimeout = setTimeout(() => {
-  if (!client.isReady()) {
-    console.error("⏰ Discord is still not READY after 30 seconds.");
-    console.error("WebSocket status:", client.ws?.status ?? "Unknown");
-    console.error("Destroyed:", client.destroyed ?? "Unknown");
-  }
+  console.error("⏰ Discord connection diagnostic after 30 seconds.");
+  console.error("Client ready:", client.isReady());
+  console.error("Client status:", client.status);
+  console.error("WebSocket status:", client.ws?.status ?? "Unknown");
+  console.error("Bot user:", client.user?.tag ?? "Not available");
+  console.error("Destroyed:", client.destroyed ?? "Unknown");
 }, 30000);
 
 client.login(DISCORD_TOKEN)
