@@ -3439,16 +3439,33 @@ TikTok Integration
   }
 );
 
-// ======================================================
-// HEALTH
-// ======================================================
+ // ======================================================
+ // HEALTH
+ // ======================================================
 
-app.get(
-  "/health",
-  (req, res) => {
-    res.status(200).send("OK");
-  }
-);
+ app.get(
+   "/health",
+   (req, res) => {
+     res.status(200).send("OK");
+   }
+ );
+
+ // ======================================================
+ // DISCORD HEALTH
+ // ======================================================
+
+ app.get("/health/discord", (req, res) => {
+   const discordReady = client.isReady();
+
+   res.status(discordReady ? 200 : 503).json({
+     web: "healthy",
+     discord: discordReady ? "connected" : "not_ready",
+     botReady: discordReady,
+     websocketStatus: client.ws?.status ?? null,
+     guildCount: client.guilds.cache.size,
+     checkedAt: new Date().toISOString()
+   });
+ });
 
 // ======================================================
 // TIKTOK TERMS VERIFICATION
