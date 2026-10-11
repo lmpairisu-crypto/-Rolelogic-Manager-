@@ -13,6 +13,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
   SlashCommandBuilder,
   AttachmentBuilder,
 } = require("discord.js");
@@ -1814,26 +1815,29 @@ async function createLampoonForumBanner(title, subtitle) {
 
 const LAMPOON_FORUM_POSTS = [
   {
-    title: "🏆 Lampoon Credits",
+    key: "credits",
+    title: "🎭 Lampoon Credits",
     bannerTitle: "LAMPOON CREDITS",
     subtitle: "YOUR CLAN • YOUR GROWTH • YOUR BENEFITS",
     filename: "lampoon-credits-banner.png",
-    body: `# 🏆 Lampoon Credits\n\nWelcome to **Lampoon Credits** — the information hub for creator recognition and features available to eligible Lampoon clan members.\n\n### ✨ Member benefits\n• **Solo Growth Dashboard** — view your TikTok growth profile, follower progress, milestones, and growth character when your account is connected and eligible.\n• **Weekly Leaderboard** — see eligible creators ranked by their current follower counts.\n• **Lampoon Category Access** — access designated Lampoon channels when you meet the server's role and access requirements.\n• **Creator Recognition** — celebrate progress and community participation.\n\n### 📌 Please note\nFeatures may require a connected TikTok account, the required Discord role, eligibility checks, and accurate account data. Access and benefits are provided by the Lampoon community and are not a paid currency or a guarantee of TikTok growth. TikTok and Discord are independent third-party services.\n\nRead the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) before connecting your account.`,
+    body: `# 🎭 Lampoon Credits\n\nWelcome to **Lampoon Credits** — the information hub for creator recognition and features available to eligible Lampoon clan members.\n\n### ✨ Member benefits\n• **Solo Growth Dashboard** — view your TikTok growth profile, follower progress, milestones, and growth character when your account is connected and eligible.\n• **Weekly Leaderboard** — see eligible creators ranked by their current follower counts.\n• **Lampoon Category Access** — access designated Lampoon channels when you meet the server's role and access requirements.\n• **Creator Recognition** — celebrate progress and community participation.\n\n### 📌 Please note\nFeatures may require a connected TikTok account, the required Discord role, eligibility checks, and accurate account data. Access and benefits are provided by the Lampoon community and are not a paid currency or a guarantee of TikTok growth. TikTok and Discord are independent third-party services.\n\nRead the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) before connecting your account.`
   },
   {
-    title: "📜 Lampoon Disclaimers",
-    bannerTitle: "LAMPOON DISCLAIMERS",
-    subtitle: "IMPORTANT INFORMATION ABOUT THE INTEGRATION",
-    filename: "lampoon-disclaimers-banner.png",
-    body: `# 📜 Lampoon Disclaimers\n\nLampoon Rolelogic Manager provides Discord community tools for TikTok creator connection, profile verification, growth tracking, milestone displays, and leaderboard features.\n\n• **No affiliation:** Lampoon is not endorsed by, affiliated with, or officially connected to TikTok or Discord.\n• **Statistics:** Follower counts and other account information may be delayed, limited, or changed by the platform.\n• **No guarantees:** Dashboard access, leaderboard placement, creator recognition, and growth results are not guaranteed.\n• **Access:** Features and private channels depend on server roles, eligibility, availability, and staff decisions.\n• **User responsibility:** Only connect accounts you control and do not share passwords or security codes with staff or bots.\n\nReview the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) for more details.`,
+    key: "terms",
+    title: "📜 Terms of Service",
+    bannerTitle: "TERMS OF SERVICE",
+    subtitle: "SERVICE TERMS • USER RESPONSIBILITIES",
+    filename: "lampoon-terms-banner.png",
+    body: `# 📜 Terms of Service\n\nThese Terms of Service govern the use of the Lampoon Role Manager TikTok integration.\n\n### Use of the Service\nThe integration allows eligible Discord members to connect a TikTok account and use TikTok-related verification, creator recognition, growth and leaderboard features.\n\n### TikTok Authorization\nBy connecting TikTok, you authorize the application to access the TikTok information permitted by the TikTok authorization process.\n\n### Eligibility\nDiscord roles and creator recognition may depend on requirements configured by the Lampoon server. Meeting or failing to meet those requirements may affect role assignment.\n\n### Accurate Information\nUsers should connect their own TikTok account and provide accurate information during the authorization process.\n\n### Service Changes\nThe Lampoon Role Manager functionality may be modified, suspended or discontinued at any time.\n\n### Third-Party Services\nTikTok and Discord are third-party services. Their respective terms and policies also apply when using their platforms.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n[Read the full Terms of Service](${BASE_URL}/terms/)`
   },
   {
+    key: "privacy",
     title: "🔒 Privacy Policy",
     bannerTitle: "PRIVACY POLICY",
     subtitle: "HOW CONNECTED ACCOUNT DATA IS HANDLED",
     filename: "lampoon-privacy-banner.png",
-    body: `# 🔒 Privacy Policy\n\nThe Lampoon Rolelogic Manager integration uses information authorized through TikTok and Discord to provide account connection, eligibility checks, Solo Growth, milestones, and leaderboard features.\n\n### Information and use\n• TikTok profile information and available statistics may be used to identify a connected creator and display growth features.\n• Discord user and server-role information may be used to check eligibility and provide the appropriate server access.\n• Connection and growth records may be stored to maintain these features.\n\n### Your choices\nYou should connect only an account you control. You may stop using the integration and revoke TikTok authorization through TikTok's account settings. Some features may stop working after disconnection.\n\nRead the full [Privacy Policy](${BASE_URL}/privacy/) and [Terms of Service](${BASE_URL}/terms/). The linked policy is the authoritative version if details differ.`,
-  },
+    body: `# 🔒 Privacy Policy\n\nThis Privacy Policy explains how Lampoon Role Manager handles information when users connect their TikTok account through the TikTok integration.\n\n### Information We Process\nWhen a user connects TikTok, the application may process information provided through the TikTok API, including TikTok username, display name, profile picture, follower count, following count, likes count, video count, and TikTok profile URL.\n\n### How Information Is Used\nThe information is used to provide TikTok verification, Discord role management, creator recognition, Solo Growth features and leaderboard functionality within the Lampoon Discord server.\n\n### Discord Account Connection\nTikTok information is associated with the Discord account that initiates the TikTok connection process.\n\n### Data Storage\nConnection and statistics information may be stored by the application in order to provide its features and maintain the user's TikTok connection.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n### Third-Party Service\nTikTok authentication and data access are provided through TikTok's official developer platform. TikTok's own privacy policies and terms also apply to the user's use of TikTok.\n\n### Changes to This Policy\nThis Privacy Policy may be updated when the functionality of the TikTok integration changes.\n\n[Read the full Privacy Policy](${BASE_URL}/privacy/)`
+  }
 ];
 
 // ======================================================
@@ -1941,7 +1945,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("lampoonforumsetup")
-    .setDescription("Create the Lampoon Credits, Disclaimers, and Privacy Policy forum posts."),
+    .setDescription("Preview a Lampoon Gold & Silver forum banner, then publish one post safely."),
 
 ];
 
@@ -2037,6 +2041,38 @@ client.on(
   async interaction => {
 
     try {
+      if (interaction.isStringSelectMenu() && interaction.customId === "lampoon_forum_banner_select") {
+        if (!interaction.memberPermissions?.has("ManageGuild")) return interaction.reply({ content: "❌ You need **Manage Server** permission.", ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
+        const post = LAMPOON_FORUM_POSTS.find((item) => item.key === interaction.values[0]);
+        if (!post) return interaction.editReply("❌ Unknown banner selection.");
+        const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle);
+        const embed = new EmbedBuilder().setColor(0xC48D21).setTitle(post.title).setDescription(post.body).setImage(`attachment://${post.filename}`).setFooter({ text: "Lampoon • Gold & Silver" }).setTimestamp();
+        const buttons = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`lampoon_forum_publish:${post.key}`).setLabel("Publish this post").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId("lampoon_forum_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+        );
+        return interaction.editReply({ content: "**Preview only — not published.** Check the title, banner, and text. Select **Publish this post** only when you are satisfied.", embeds: [embed], files: [{ attachment: banner, name: post.filename }], components: [buttons] });
+      }
+
+      if (interaction.isButton() && (interaction.customId === "lampoon_forum_cancel" || interaction.customId.startsWith("lampoon_forum_publish:"))) {
+        if (!interaction.memberPermissions?.has("ManageGuild")) return interaction.reply({ content: "❌ You need **Manage Server** permission.", ephemeral: true });
+        if (interaction.customId === "lampoon_forum_cancel") return interaction.update({ content: "Cancelled. Nothing was published.", embeds: [], files: [], components: [] });
+        await interaction.deferUpdate();
+        const key = interaction.customId.split(":")[1];
+        const post = LAMPOON_FORUM_POSTS.find((item) => item.key === key);
+        const forum = await client.channels.fetch(LAMPOON_FORUM_CHANNEL_ID).catch(() => null);
+        if (!post) return interaction.editReply({ content: "❌ Unknown post selection.", embeds: [], files: [], components: [] });
+        if (!forum || !forum.isThreadOnly?.()) return interaction.editReply({ content: "❌ Configured channel is not a Forum channel or the bot cannot access it. Check `LAMPOON_FORUM_CHANNEL_ID` and bot permissions.", embeds: [], files: [], components: [] });
+        // Avoid duplicate active posts with the same title; never delete or overwrite existing posts.
+        await forum.threads.fetchActive().catch(() => null);
+        const existing = forum.threads.cache.find((thread) => thread.name === post.title);
+        if (existing) return interaction.editReply({ content: `⚠️ A post named **${post.title}** already exists: <#${existing.id}>. Nothing new was created.`, embeds: [], files: [], components: [] });
+        const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle);
+        const embed = new EmbedBuilder().setColor(0xC48D21).setTitle(post.title).setDescription(post.body).setImage(`attachment://${post.filename}`).setFooter({ text: "Lampoon • Gold & Silver" }).setTimestamp();
+        const thread = await forum.threads.create({ name: post.title, message: { content: "**Lampoon • Official Information**", embeds: [embed], files: [{ attachment: banner, name: post.filename }] }, reason: "Publish approved Lampoon information forum post" });
+        return interaction.editReply({ content: `✅ Published **${post.title}**: <#${thread.id}>`, embeds: [], files: [], components: [] });
+      }
 
       // ==================================================
       // SLASH COMMANDS
@@ -2050,32 +2086,20 @@ client.on(
           if (!interaction.memberPermissions?.has("ManageGuild")) {
             return interaction.reply({ content: "❌ You need **Manage Server** permission to set up these forum posts.", ephemeral: true });
           }
-          await interaction.deferReply({ ephemeral: true });
-          const forum = await client.channels.fetch(LAMPOON_FORUM_CHANNEL_ID).catch(() => null);
-          if (!forum || !forum.isThreadOnly?.()) {
-            return interaction.editReply("❌ The configured channel is not a Discord Forum channel or the bot cannot access it. Check `LAMPOON_FORUM_CHANNEL_ID` and the bot's permissions.");
-          }
-          const created = [];
-          for (const post of LAMPOON_FORUM_POSTS) {
-            const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle);
-            const embed = new EmbedBuilder()
-              .setColor(0xC48D21)
-              .setTitle(post.title)
-              .setDescription(post.body)
-              .setImage(`attachment://${post.filename}`)
-              .setFooter({ text: "Lampoon • Gold Standard" })
-              .setTimestamp();
-            const thread = await forum.threads.create({
-              name: post.title,
-              message: { content: `**Lampoon • Official Information**`, embeds: [embed], files: [{ attachment: banner, name: post.filename }] },
-              reason: "Create official Lampoon credits and policy forum posts",
-            });
-            created.push(`<#${thread.id}>`);
-          }
-          return interaction.editReply(`✅ Created the three Lampoon forum posts:
-${created.join("\n")}
-
-Run this command only when you intend to create a fresh set; it creates new posts each time.`);
+          const menu = new StringSelectMenuBuilder()
+            .setCustomId("lampoon_forum_banner_select")
+            .setPlaceholder("Choose a banner to preview")
+            .addOptions(LAMPOON_FORUM_POSTS.map((post) => ({
+              label: post.title.replace(/^\p{Emoji}\uFE0F?\s*/u, ""),
+              value: post.key,
+              description: `Generate a Gold & Silver ${post.bannerTitle.toLowerCase()} banner`,
+              emoji: post.key === "credits" ? "🎭" : post.key === "terms" ? "📜" : "🔒"
+            })));
+          return interaction.reply({
+            content: "**Lampoon Forum Banner Generator**\nChoose one post below. The bot will generate a gold-and-silver framed banner and show a preview. Nothing will be published until you confirm.",
+            components: [new ActionRowBuilder().addComponents(menu)],
+            ephemeral: true
+          });
         }
 
         // ----------------------------------------------
