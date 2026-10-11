@@ -69,6 +69,10 @@ const LMP_TAG_CHANNEL_ID =
   process.env.LMP_TAG_CHANNEL_ID ||
   "1539643480714903602";
 
+const LAMPOON_FORUM_CHANNEL_ID =
+  process.env.LAMPOON_FORUM_CHANNEL_ID ||
+  "1540239891756220468";
+
 // ======================================================
 // TIKTOK EMOJI
 // ======================================================
@@ -1785,6 +1789,54 @@ function createLeaderboardEmbed(
 }
 
 // ======================================================
+// LAMPOON CREDIT / LEGAL FORUM POSTS
+// ======================================================
+
+async function createLampoonForumBanner(title, subtitle) {
+  const safeTitle = String(title).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safeSubtitle = String(subtitle).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const svg = `<svg width="1600" height="600" viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FFF0A0"/><stop offset="30%" stop-color="#F8D85C"/><stop offset="65%" stop-color="#C48D21"/><stop offset="100%" stop-color="#8A5A12"/></linearGradient>
+    <radialGradient id="bg"><stop offset="0%" stop-color="#241a08"/><stop offset="100%" stop-color="#050505"/></radialGradient>
+  </defs>
+  <rect width="1600" height="600" fill="url(#bg)"/>
+  <rect x="24" y="24" width="1552" height="552" rx="32" fill="none" stroke="url(#gold)" stroke-width="8"/>
+  <circle cx="190" cy="300" r="108" fill="none" stroke="url(#gold)" stroke-width="8"/>
+  <path d="M112 276 L140 205 L180 250 L210 166 L240 250 L280 205 L302 276 L280 315 L140 315 Z" fill="url(#gold)" stroke="#8A5A12" stroke-width="4"/>
+  <text x="360" y="275" fill="url(#gold)" font-family="Arial, sans-serif" font-size="76" font-weight="900" letter-spacing="3">${safeTitle}</text>
+  <text x="366" y="350" fill="#F2E6C5" font-family="Arial, sans-serif" font-size="30" letter-spacing="2">${safeSubtitle}</text>
+  <path d="M365 390 H1450" stroke="url(#gold)" stroke-width="5"/>
+  <text x="366" y="455" fill="#C48D21" font-family="Arial, sans-serif" font-size="24" letter-spacing="7">LAMPOON • GOLD STANDARD</text>
+  </svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+const LAMPOON_FORUM_POSTS = [
+  {
+    title: "🏆 Lampoon Credits",
+    bannerTitle: "LAMPOON CREDITS",
+    subtitle: "YOUR CLAN • YOUR GROWTH • YOUR BENEFITS",
+    filename: "lampoon-credits-banner.png",
+    body: `# 🏆 Lampoon Credits\n\nWelcome to **Lampoon Credits** — the information hub for creator recognition and features available to eligible Lampoon clan members.\n\n### ✨ Member benefits\n• **Solo Growth Dashboard** — view your TikTok growth profile, follower progress, milestones, and growth character when your account is connected and eligible.\n• **Weekly Leaderboard** — see eligible creators ranked by their current follower counts.\n• **Lampoon Category Access** — access designated Lampoon channels when you meet the server's role and access requirements.\n• **Creator Recognition** — celebrate progress and community participation.\n\n### 📌 Please note\nFeatures may require a connected TikTok account, the required Discord role, eligibility checks, and accurate account data. Access and benefits are provided by the Lampoon community and are not a paid currency or a guarantee of TikTok growth. TikTok and Discord are independent third-party services.\n\nRead the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) before connecting your account.`,
+  },
+  {
+    title: "📜 Lampoon Disclaimers",
+    bannerTitle: "LAMPOON DISCLAIMERS",
+    subtitle: "IMPORTANT INFORMATION ABOUT THE INTEGRATION",
+    filename: "lampoon-disclaimers-banner.png",
+    body: `# 📜 Lampoon Disclaimers\n\nLampoon Rolelogic Manager provides Discord community tools for TikTok creator connection, profile verification, growth tracking, milestone displays, and leaderboard features.\n\n• **No affiliation:** Lampoon is not endorsed by, affiliated with, or officially connected to TikTok or Discord.\n• **Statistics:** Follower counts and other account information may be delayed, limited, or changed by the platform.\n• **No guarantees:** Dashboard access, leaderboard placement, creator recognition, and growth results are not guaranteed.\n• **Access:** Features and private channels depend on server roles, eligibility, availability, and staff decisions.\n• **User responsibility:** Only connect accounts you control and do not share passwords or security codes with staff or bots.\n\nReview the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) for more details.`,
+  },
+  {
+    title: "🔒 Privacy Policy",
+    bannerTitle: "PRIVACY POLICY",
+    subtitle: "HOW CONNECTED ACCOUNT DATA IS HANDLED",
+    filename: "lampoon-privacy-banner.png",
+    body: `# 🔒 Privacy Policy\n\nThe Lampoon Rolelogic Manager integration uses information authorized through TikTok and Discord to provide account connection, eligibility checks, Solo Growth, milestones, and leaderboard features.\n\n### Information and use\n• TikTok profile information and available statistics may be used to identify a connected creator and display growth features.\n• Discord user and server-role information may be used to check eligibility and provide the appropriate server access.\n• Connection and growth records may be stored to maintain these features.\n\n### Your choices\nYou should connect only an account you control. You may stop using the integration and revoke TikTok authorization through TikTok's account settings. Some features may stop working after disconnection.\n\nRead the full [Privacy Policy](${BASE_URL}/privacy/) and [Terms of Service](${BASE_URL}/terms/). The linked policy is the authoritative version if details differ.`,
+  },
+];
+
+// ======================================================
 // SLASH COMMANDS
 // ======================================================
 
@@ -1885,6 +1937,13 @@ const commands = [
             )
             .setRequired(true)
         )
+    ),
+
+  new SlashCommandBuilder()
+    .setName("lampoonforum")
+    .setDescription("Create the three Lampoon credit and policy forum posts.")
+    .addSubcommand(sub =>
+      sub.setName("setup").setDescription("Create the Lampoon Credits, Disclaimers, and Privacy Policy posts.")
     ),
 
 ];
@@ -2009,6 +2068,38 @@ client.on(
       if (
         interaction.isChatInputCommand()
       ) {
+
+        if (interaction.commandName === "lampoonforum") {
+          if (!interaction.memberPermissions?.has("ManageGuild")) {
+            return interaction.reply({ content: "❌ You need **Manage Server** permission to set up these forum posts.", ephemeral: true });
+          }
+          await interaction.deferReply({ ephemeral: true });
+          const forum = await client.channels.fetch(LAMPOON_FORUM_CHANNEL_ID).catch(() => null);
+          if (!forum || !forum.isThreadOnly?.()) {
+            return interaction.editReply("❌ The configured channel is not a Discord Forum channel or the bot cannot access it. Check `LAMPOON_FORUM_CHANNEL_ID` and the bot's permissions.");
+          }
+          const created = [];
+          for (const post of LAMPOON_FORUM_POSTS) {
+            const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle);
+            const embed = new EmbedBuilder()
+              .setColor(0xC48D21)
+              .setTitle(post.title)
+              .setDescription(post.body)
+              .setImage(`attachment://${post.filename}`)
+              .setFooter({ text: "Lampoon • Gold Standard" })
+              .setTimestamp();
+            const thread = await forum.threads.create({
+              name: post.title,
+              message: { content: `**Lampoon • Official Information**`, embeds: [embed], files: [{ attachment: banner, name: post.filename }] },
+              reason: "Create official Lampoon credits and policy forum posts",
+            });
+            created.push(`<#${thread.id}>`);
+          }
+          return interaction.editReply(`✅ Created the three Lampoon forum posts:
+${created.join("\n")}
+
+Run this command only when you intend to create a fresh set; it creates new posts each time.`);
+        }
 
         // ----------------------------------------------
         // /tiktok
