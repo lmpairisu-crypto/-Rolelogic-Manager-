@@ -3182,32 +3182,30 @@ TikTok Integration
 // TIKTOK PRIVACY VERIFICATION
 // ======================================================
 
-
 app.get(
-  "/privacy/tiktokQ4LN9p5PLTjbMhuIQL55c6e6hUYQXuRA.txt",
+  "/privacy/tiktokLeSYMJhBXi9nNbrq5zKfgSWppsKxyxSn.txt",
   (req, res) => {
     res
       .status(200)
       .type("text/plain")
       .send(
-        "tiktok-developers-site-verification=Q4LN9p5PLTjbMhuIQL55c6e6hUYQXuRA"
+        "tiktok-developers-site-verification=LeSYMJhBXi9nNbrq5zKfgSWppsKxyxSn"
       );
   }
 );
-
 
 // ======================================================
 // TIKTOK MAIN WEBSITE VERIFICATION
 // ======================================================
 
 app.get(
-  "/tiktokqwbP2ff89Ir4Xbe5sw3lru4K2bBQImUs.txt",
+  "/tiktokkbqE5Qed8rDx52RifhNIfWieGVdXoXQA.txt",
   (req, res) => {
     res
       .status(200)
       .type("text/plain")
       .send(
-        "tiktok-developers-site-verification=qwbP2ff89Ir4Xbe5sw3lru4K2bBQImUs"
+        "tiktok-developers-site-verification=kbqE5Qed8rDx52RifhNIfWieGVdXoXQA"
       );
   }
 );
@@ -3349,7 +3347,6 @@ TikTok Integration
   }
 );
 
-
 // ======================================================
 // HEALTH
 // ======================================================
@@ -3361,37 +3358,34 @@ app.get(
   }
 );
 
-
 // ======================================================
 // TIKTOK TERMS VERIFICATION
 // ======================================================
 
-
 app.get(
-  "/terms/tiktokNIl1SYpNbDRmzcOBhiMScyHvJVYEPttg.txt",
+  "/terms/tiktokhUadW06iHudmxpAtU7oKAcWufyloJUbC.txt",
   (req, res) => {
     res
       .status(200)
       .type("text/plain")
       .send(
-        "tiktok-developers-site-verification=NIl1SYpNbDRmzcOBhiMScyHvJVYEPttg"
+        "tiktok-developers-site-verification=hUadW06iHudmxpAtU7oKAcWufyloJUbC"
       );
   }
 );
-
 
 // ======================================================
 // TIKTOK CALLBACK VERIFICATION
 // ======================================================
 
 app.get(
-  "/tiktok/callback/tiktokLzcHFDUthAgAaWC16LVdJvP2uH0RAEJn.txt",
+  "/tiktok/callback/tiktokpqTgrnWdut1Sv4qeFCWIAju1qmI0Vh1K.txt",
   (req, res) => {
     res
       .status(200)
       .type("text/plain")
       .send(
-        "tiktok-developers-site-verification=LzcHFDUthAgAaWC16LVdJvP2uH0RAEJn"
+        "tiktok-developers-site-verification=pqTgrnWdut1Sv4qeFCWIAju1qmI0Vh1K"
       );
   }
 );
