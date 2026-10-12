@@ -3839,6 +3839,22 @@ app.listen(
  // DISCORD LOGIN DIAGNOSTICS
  // ======================================================
 
+fetch("https://discord.com/api/v10/gateway/bot", {
+  headers: {
+    Authorization: `Bot ${DISCORD_TOKEN}`
+  },
+  signal: AbortSignal.timeout(10000)
+})
+  .then(async (response) => {
+    console.log("Discord API test status:", response.status);
+    if (!response.ok) {
+      console.error("Discord API response:", await response.text());
+    }
+  })
+  .catch((error) => {
+    console.error("Discord API test failed:", error.name, error.message);
+  });
+
 console.log("Starting Discord login...");
 console.log("DISCORD_TOKEN configured:", Boolean(DISCORD_TOKEN));
 console.log("DISCORD_CLIENT_ID:", DISCORD_CLIENT_ID);
