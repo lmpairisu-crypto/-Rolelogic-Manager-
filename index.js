@@ -3105,7 +3105,7 @@ app.get(
                 const embed = new EmbedBuilder()
                   .setColor("#C48D21")
                   .setAuthor({ name: "Lampoon Integration" })
-                  .setTitle("🏆 lampoon Creator Recognition")
+                  .setTitle("🎭 lampoon Creator Recognition")
                   .setDescription([
                     "**OFFICIAL TIKTOK VERIFICATION**",
                     `Congratulations, <@${session.userId}>! Your Lampoon creator membership has been certified.`,
