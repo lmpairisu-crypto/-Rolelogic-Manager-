@@ -40,15 +40,24 @@ const BASE_URL =
 const SESSION_SECRET =
   process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 
-// OzVault object-storage configuration (optional until enabled in Render).
-// The storage API requires encrypted object operations; this block only checks
-// credentials/bucket access and deliberately does not upload plaintext files.
+// OzVault encrypted object storage. The official OzVault CLI handles the
+// provider's encryption format, resumable transfer protocol, and integrity checks.
 const OZVAULT_API_KEY = process.env.OZVAULT_API_KEY || "";
 const OZVAULT_API_ORIGIN = (
   process.env.OZVAULT_API_ORIGIN || "https://api.ozvault.lol"
 ).replace(/\/$/, "");
 const OZVAULT_BUCKET_ID = process.env.OZVAULT_BUCKET_ID || "";
-const OZVAULT_RECOVERY_KEY = process.env.OZVAULT_RECOVERY_KEY || "";
+// OzVault calls this the vault/recovery key. It is never sent to the API.
+const OZVAULT_RECOVERY_KEY =
+  process.env.OZVAULT_RECOVERY_KEY || process.env.OZVAULT_VAULT_KEY || "";
+const OZVAULT_CLI_PATH = path.join(__dirname, "ozvault.mjs");
+const OZVAULT_BACKUP_KEEP = Math.max(2, Math.min(30, Number(process.env.OZVAULT_BACKUP_KEEP) || 7));
+const OZVAULT_BACKUP_INTERVAL_MS = Math.max(60_000, Number(process.env.OZVAULT_BACKUP_INTERVAL_MS) || 10 * 60 * 1000);
+let ozVaultLastBackupAt = null;
+let ozVaultLastBackupStatus = "not_run";
+let ozVaultLastBackupError = null;
+let ozVaultBackupInProgress = false;
+let ozVaultBackupTimer = null;
 
 
 const GUILD_ID =
@@ -141,6 +150,160 @@ const MILESTONES_FILE = path.join(
 );
 
 // ======================================================
+// OZVAULT ENCRYPTED BACKUP / RECOVERY
+// ======================================================
+// The official CLI is downloaded during npm postinstall and SHA-256 verified.
+// All data stays local if OzVault is not configured or temporarily unavailable.
+function ozVaultConfigured() {
+  return Boolean(OZVAULT_API_KEY && OZVAULT_BUCKET_ID && OZVAULT_RECOVERY_KEY);
+}
+
+function ozVaultChildEnv() {
+  return {
+    ...process.env,
+    OZVAULT_API_KEY,
+    OZVAULT_API_ORIGIN,
+    OZVAULT_BUCKET: OZVAULT_BUCKET_ID,
+    OZVAULT_VAULT_KEY: OZVAULT_RECOVERY_KEY,
+    NO_COLOR: "1",
+  };
+}
+
+function runOzVaultCli(args, timeout = 5 * 60 * 1000) {
+  if (!fs.existsSync(OZVAULT_CLI_PATH)) {
+    throw new Error("OzVault CLI is missing; the verified postinstall download may have failed.");
+  }
+  const { spawnSync } = require("node:child_process");
+  const result = spawnSync(process.execPath, [OZVAULT_CLI_PATH, ...args], {
+    env: ozVaultChildEnv(),
+    encoding: "utf8",
+    timeout,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    const detail = String(result.stderr || result.stdout || `exit ${result.status}`).trim();
+    // Do not echo credentials or environment variables into logs.
+    throw new Error(`OzVault CLI failed (${result.status}): ${detail.slice(0, 700)}`);
+  }
+  return String(result.stdout || "").trim();
+}
+
+function restoreOzVaultBackupIfMissing(localPath, backupName) {
+  if (!ozVaultConfigured() || fs.existsSync(localPath)) return false;
+  try {
+    fs.mkdirSync(path.dirname(localPath), { recursive: true });
+    runOzVaultCli([
+      "restore-backup", "--bucket", OZVAULT_BUCKET_ID,
+      "--name", backupName, "-o", localPath,
+    ]);
+    if (fs.existsSync(localPath) && fs.statSync(localPath).size > 0) {
+      console.log(`[OzVault] Restored missing local data: ${backupName}`);
+      return true;
+    }
+  } catch (error) {
+    console.warn(`[OzVault] No usable startup backup for ${backupName}: ${error.message}`);
+    try { if (fs.existsSync(localPath)) fs.unlinkSync(localPath); } catch {}
+  }
+  return false;
+}
+
+function restoreOzVaultDataBeforeLoading() {
+  if (!ozVaultConfigured()) return;
+  // Only restore absent files. Existing local data is never overwritten at startup.
+  restoreOzVaultBackupIfMissing(CONNECTIONS_FILE, "tiktok-connections.json");
+  restoreOzVaultBackupIfMissing(SNAPSHOTS_FILE, "tiktok-snapshots.json");
+  restoreOzVaultBackupIfMissing(MILESTONES_FILE, "growth-milestones.json");
+  const characterEntries = fs.existsSync(CHARACTER_DIR)
+    ? fs.readdirSync(CHARACTER_DIR).filter(name => !name.startsWith("."))
+    : [];
+  const archivePath = path.join(DATA_DIR, ".ozvault-growth-characters.tar.gz");
+  if (characterEntries.length === 0) {
+    try {
+      restoreOzVaultBackupIfMissing(archivePath, "growth-characters.tar.gz");
+      if (fs.existsSync(archivePath) && fs.statSync(archivePath).size > 0) {
+        const { spawnSync } = require("node:child_process");
+        const result = spawnSync("tar", ["-xzf", archivePath, "-C", DATA_DIR], { encoding: "utf8", timeout: 120000 });
+        if (result.status !== 0) throw new Error(String(result.stderr || "tar extraction failed").slice(0, 400));
+        console.log("[OzVault] Restored custom growth characters.");
+      }
+    } catch (error) {
+      console.warn(`[OzVault] Character restore skipped: ${error.message}`);
+    } finally {
+      try { if (fs.existsSync(archivePath)) fs.unlinkSync(archivePath); } catch {}
+    }
+  }
+}
+
+function backupOneFile(localPath, backupName) {
+  if (!fs.existsSync(localPath) || !fs.statSync(localPath).isFile()) return;
+  runOzVaultCli([
+    "backup", localPath,
+    "--bucket", OZVAULT_BUCKET_ID,
+    "--name", backupName,
+    "--keep", String(OZVAULT_BACKUP_KEEP),
+  ]);
+}
+
+function performOzVaultBackup(reason = "scheduled") {
+  if (!ozVaultConfigured()) return Promise.resolve(false);
+  if (ozVaultBackupInProgress) return Promise.resolve(false);
+  ozVaultBackupInProgress = true;
+  return new Promise(resolve => {
+    setImmediate(() => {
+      try {
+        backupOneFile(CONNECTIONS_FILE, "tiktok-connections.json");
+        backupOneFile(SNAPSHOTS_FILE, "tiktok-snapshots.json");
+        backupOneFile(MILESTONES_FILE, "growth-milestones.json");
+
+        const characterNames = fs.readdirSync(CHARACTER_DIR).filter(name => {
+          const fullPath = path.join(CHARACTER_DIR, name);
+          return !name.startsWith(".") && fs.existsSync(fullPath) && fs.statSync(fullPath).isFile();
+        });
+        if (characterNames.length) {
+          const archivePath = path.join(DATA_DIR, ".ozvault-growth-characters.tar.gz");
+          const { spawnSync } = require("node:child_process");
+          const tarResult = spawnSync("tar", ["-czf", archivePath, "-C", DATA_DIR, "growth-characters"], {
+            encoding: "utf8", timeout: 120000,
+          });
+          if (tarResult.status !== 0) throw new Error(String(tarResult.stderr || "Could not archive character images").slice(0, 500));
+          try {
+            backupOneFile(archivePath, "growth-characters.tar.gz");
+          } finally {
+            try { fs.unlinkSync(archivePath); } catch {}
+          }
+        }
+        ozVaultLastBackupAt = new Date().toISOString();
+        ozVaultLastBackupStatus = "success";
+        ozVaultLastBackupError = null;
+        console.log(`[OzVault] Encrypted data backup completed (${reason}) at ${ozVaultLastBackupAt}.`);
+        resolve(true);
+      } catch (error) {
+        ozVaultLastBackupStatus = "error";
+        ozVaultLastBackupError = error.message;
+        console.error(`[OzVault] Encrypted backup failed (${reason}):`, error.message);
+        resolve(false);
+      } finally {
+        ozVaultBackupInProgress = false;
+      }
+    });
+  });
+}
+
+function scheduleOzVaultBackup() {
+  if (!ozVaultConfigured()) return;
+  if (ozVaultBackupTimer) clearTimeout(ozVaultBackupTimer);
+  ozVaultBackupTimer = setTimeout(() => {
+    ozVaultBackupTimer = null;
+    void performOzVaultBackup("data changed");
+  }, 30_000);
+  if (typeof ozVaultBackupTimer.unref === "function") ozVaultBackupTimer.unref();
+}
+
+// Recover only absent files before loadJSON creates empty defaults.
+restoreOzVaultDataBeforeLoading();
+
+// ======================================================
 // JSON HELPERS
 // ======================================================
 
@@ -174,6 +337,7 @@ function saveJSON(file, data) {
       file,
       JSON.stringify(data, null, 2)
     );
+    scheduleOzVaultBackup();
   } catch (error) {
     console.error(
       `Failed saving ${file}:`,
@@ -1811,50 +1975,78 @@ function createLeaderboardEmbed(
 // LAMPOON CREDIT / LEGAL FORUM POSTS
 // ======================================================
 
-async function createLampoonForumBanner(title, subtitle) {
+async function createLampoonForumBanner(title, subtitle, category = "credits") {
   const safeTitle = String(title).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const safeSubtitle = String(subtitle).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const svg = `<svg width="1600" height="600" viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg">
+
+  // Square forum banner: a category-specific icon replaces the old LMP monogram.
+  const categoryMarks = {
+    credits: '<path d="M1190 355 L1220 378 L1252 355 L1243 396 L1275 416 L1235 423 L1220 462 L1205 423 L1165 416 L1197 396 Z" fill="url(#gold)" stroke="#8A5A12" stroke-width="4"/><path d="M1180 440 L1190 487 L1220 472 L1250 487 L1260 440" fill="none" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round"/>',
+    disclaimers: '<path d="M1220 355 V465 M1170 375 H1270 M1190 375 L1160 430 H1220 Z M1250 375 L1220 430 H1280 Z" fill="none" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round"/><path d="M1185 476 H1255 M1200 465 L1185 476 L1200 487 M1240 465 L1255 476 L1240 487" fill="none" stroke="url(#gold)" stroke-width="8"/>',
+    terms: '<path d="M1180 350 H1240 L1260 370 V485 H1180 Z" fill="none" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round"/><path d="M1240 350 V375 H1260 M1195 400 H1245 M1195 425 H1245 M1195 450 H1235" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round"/>',
+    privacy: '<path d="M1220 345 L1280 370 V417 C1280 459 1252 488 1220 505 C1188 488 1160 459 1160 417 V370 Z" fill="none" stroke="url(#gold)" stroke-width="10"/><rect x="1197" y="410" width="46" height="40" rx="7" fill="url(#gold)"/><path d="M1206 410 V396 C1206 377 1234 377 1234 396 V410" fill="none" stroke="url(#gold)" stroke-width="9"/>'
+  };
+  const categoryMark = categoryMarks[category] || categoryMarks.credits;
+  const titleFontSize = safeTitle.length > 17 ? 46 : safeTitle.length > 12 ? 54 : 64;
+  const subtitleFontSize = safeSubtitle.length > 34 ? 19 : 25;
+
+  const svg = `<svg width="900" height="900" viewBox="0 0 900 900" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FFF0A0"/><stop offset="30%" stop-color="#F8D85C"/><stop offset="65%" stop-color="#C48D21"/><stop offset="100%" stop-color="#8A5A12"/></linearGradient>
     <radialGradient id="bg"><stop offset="0%" stop-color="#241a08"/><stop offset="100%" stop-color="#050505"/></radialGradient>
   </defs>
-  <rect width="1600" height="600" fill="url(#bg)"/>
-  <rect x="24" y="24" width="1552" height="552" rx="32" fill="none" stroke="url(#gold)" stroke-width="8"/>
-  <circle cx="190" cy="300" r="108" fill="none" stroke="url(#gold)" stroke-width="8"/>
-  <path d="M112 276 L140 205 L180 250 L210 166 L240 250 L280 205 L302 276 L280 315 L140 315 Z" fill="url(#gold)" stroke="#8A5A12" stroke-width="4"/>
-  <text x="360" y="275" fill="url(#gold)" font-family="Arial, sans-serif" font-size="76" font-weight="900" letter-spacing="3">${safeTitle}</text>
-  <text x="366" y="350" fill="#F2E6C5" font-family="Arial, sans-serif" font-size="30" letter-spacing="2">${safeSubtitle}</text>
-  <path d="M365 390 H1450" stroke="url(#gold)" stroke-width="5"/>
-  <text x="366" y="455" fill="#C48D21" font-family="Arial, sans-serif" font-size="24" letter-spacing="7">LAMPOON • GOLD STANDARD</text>
+  <rect width="900" height="900" fill="url(#bg)"/>
+  <rect x="18" y="18" width="864" height="864" rx="30" fill="none" stroke="url(#gold)" stroke-width="7"/>
+  <circle cx="450" cy="190" r="112" fill="#080808" stroke="url(#gold)" stroke-width="7"/>
+  <g transform="translate(-404 -108) scale(0.7)">${categoryMark}</g>
+  <text x="450" y="405" text-anchor="middle" fill="url(#gold)" font-family="Arial, sans-serif" font-size="${titleFontSize}" font-weight="900" letter-spacing="1.4">${safeTitle}</text>
+  <text x="450" y="465" text-anchor="middle" fill="#F2E6C5" font-family="Arial, sans-serif" font-size="${subtitleFontSize}" letter-spacing="1.3">${safeSubtitle}</text>
+  <path d="M145 520 H755" stroke="url(#gold)" stroke-width="4"/>
+  <text x="450" y="705" text-anchor="middle" fill="#C48D21" font-family="Arial, sans-serif" font-size="23" font-weight="700" letter-spacing="1.5">LMP HOK SATIRE</text>
+  <text x="450" y="745" text-anchor="middle" fill="#F2E6C5" font-family="Arial, sans-serif" font-size="20" letter-spacing="1.2">CREATOR CLAN | EST. 2026</text>
   </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
-
 const LAMPOON_FORUM_POSTS = [
   {
     key: "credits",
-    title: "🎭 Lampoon Credits",
+    title: "🏆 Lampoon Credits",
+    author: "Credit • Disclaimers",
+    bannerCategory: "credits",
     bannerTitle: "LAMPOON CREDITS",
     subtitle: "YOUR CLAN • YOUR GROWTH • YOUR BENEFITS",
     filename: "lampoon-credits-banner.png",
-    body: `# 🎭 Lampoon Credits\n\nWelcome to **Lampoon Credits** — the information hub for creator recognition and features available to eligible Lampoon clan members.\n\n### ✨ Member benefits\n• **Solo Growth Dashboard** — view your TikTok growth profile, follower progress, milestones, and growth character when your account is connected and eligible.\n• **Weekly Leaderboard** — see eligible creators ranked by their current follower counts.\n• **Lampoon Category Access** — access designated Lampoon channels when you meet the server's role and access requirements.\n• **Creator Recognition** — celebrate progress and community participation.\n\n### 📌 Please note\nFeatures may require a connected TikTok account, the required Discord role, eligibility checks, and accurate account data. Access and benefits are provided by the Lampoon community and are not a paid currency or a guarantee of TikTok growth. TikTok and Discord are independent third-party services.\n\nRead the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) before connecting your account.`
+    body: `Welcome to **Lampoon Credits** — the information hub for creator recognition and features available to eligible Lampoon clan members.\n\n### ✨ Member benefits\n• **Solo Growth Dashboard** — view your TikTok growth profile, follower progress, milestones, and growth character when your account is connected and eligible.\n• **Weekly Leaderboard** — see eligible creators ranked by their current follower counts.\n• **Lampoon Category Access** — access designated Lampoon channels when you meet the server's role and access requirements.\n• **Creator Recognition** — celebrate progress and community participation.\n\n### 📌 Please note\nFeatures may require a connected TikTok account, the required Discord role, eligibility checks, and accurate account data. Access and benefits are provided by the Lampoon community and are not a paid currency or a guarantee of TikTok growth. TikTok and Discord are independent third-party services.\n\nRead the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) before connecting your account.`
+  },
+  {
+    key: "disclaimers",
+    title: "📜 Lampoon Disclaimers",
+    author: "Credit • Disclaimers",
+    bannerCategory: "disclaimers",
+    bannerTitle: "LAMPOON DISCLAIMERS",
+    subtitle: "IMPORTANT INFORMATION ABOUT THE INTEGRATION",
+    filename: "lampoon-disclaimers-banner.png",
+    body: `Lampoon Rolelogic Manager provides Discord community tools for TikTok creator connection, profile verification, growth tracking, milestone displays, and leaderboard features.\n\n• **No affiliation:** Lampoon is not endorsed by, affiliated with, or officially connected to TikTok or Discord.\n• **Statistics:** Follower counts and other account information may be delayed, limited, or changed by the platform.\n• **No guarantees:** Dashboard access, leaderboard placement, creator recognition, and growth results are not guaranteed.\n• **Access:** Features and private channels depend on server roles, eligibility, availability, and staff decisions.\n• **User responsibility:** Only connect accounts you control and do not share passwords or security codes with staff or bots.\n\nReview the [Terms of Service](${BASE_URL}/terms/) and [Privacy Policy](${BASE_URL}/privacy/) for more details.`
   },
   {
     key: "terms",
     title: "📜 Terms of Service",
+    author: "Credit • Disclaimers",
+    bannerCategory: "terms",
     bannerTitle: "TERMS OF SERVICE",
     subtitle: "SERVICE TERMS • USER RESPONSIBILITIES",
     filename: "lampoon-terms-banner.png",
-    body: `# 📜 Terms of Service\n\nThese Terms of Service govern the use of the Lampoon Role Manager TikTok integration.\n\n### Use of the Service\nThe integration allows eligible Discord members to connect a TikTok account and use TikTok-related verification, creator recognition, growth and leaderboard features.\n\n### TikTok Authorization\nBy connecting TikTok, you authorize the application to access the TikTok information permitted by the TikTok authorization process.\n\n### Eligibility\nDiscord roles and creator recognition may depend on requirements configured by the Lampoon server. Meeting or failing to meet those requirements may affect role assignment.\n\n### Accurate Information\nUsers should connect their own TikTok account and provide accurate information during the authorization process.\n\n### Service Changes\nThe Lampoon Role Manager functionality may be modified, suspended or discontinued at any time.\n\n### Third-Party Services\nTikTok and Discord are third-party services. Their respective terms and policies also apply when using their platforms.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n[Read the full Terms of Service](${BASE_URL}/terms/)`
+    body: `These Terms of Service govern the use of the Lampoon Role Manager TikTok integration.\n\n### Use of the Service\nThe integration allows eligible Discord members to connect a TikTok account and use TikTok-related verification, creator recognition, growth and leaderboard features.\n\n### TikTok Authorization\nBy connecting TikTok, you authorize the application to access the TikTok information permitted by the TikTok authorization process.\n\n### Eligibility\nDiscord roles and creator recognition may depend on requirements configured by the Lampoon server. Meeting or failing to meet those requirements may affect role assignment.\n\n### Accurate Information\nUsers should connect their own TikTok account and provide accurate information during the authorization process.\n\n### Service Changes\nThe Lampoon Role Manager functionality may be modified, suspended or discontinued at any time.\n\n### Third-Party Services\nTikTok and Discord are third-party services. Their respective terms and policies also apply when using their platforms.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n[Read the full Terms of Service](${BASE_URL}/terms/)`
   },
   {
     key: "privacy",
     title: "🔒 Privacy Policy",
+    author: "Credit • Disclaimers",
+    bannerCategory: "privacy",
     bannerTitle: "PRIVACY POLICY",
     subtitle: "HOW CONNECTED ACCOUNT DATA IS HANDLED",
     filename: "lampoon-privacy-banner.png",
-    body: `# 🔒 Privacy Policy\n\nThis Privacy Policy explains how Lampoon Role Manager handles information when users connect their TikTok account through the TikTok integration.\n\n### Information We Process\nWhen a user connects TikTok, the application may process information provided through the TikTok API, including TikTok username, display name, profile picture, follower count, following count, likes count, video count, and TikTok profile URL.\n\n### How Information Is Used\nThe information is used to provide TikTok verification, Discord role management, creator recognition, Solo Growth features and leaderboard functionality within the Lampoon Discord server.\n\n### Discord Account Connection\nTikTok information is associated with the Discord account that initiates the TikTok connection process.\n\n### Data Storage\nConnection and statistics information may be stored by the application in order to provide its features and maintain the user's TikTok connection.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n### Third-Party Service\nTikTok authentication and data access are provided through TikTok's official developer platform. TikTok's own privacy policies and terms also apply to the user's use of TikTok.\n\n### Changes to This Policy\nThis Privacy Policy may be updated when the functionality of the TikTok integration changes.\n\n[Read the full Privacy Policy](${BASE_URL}/privacy/)`
+    body: `This Privacy Policy explains how Lampoon Role Manager handles information when users connect their TikTok account through the TikTok integration.\n\n### Information We Process\nWhen a user connects TikTok, the application may process information provided through the TikTok API, including TikTok username, display name, profile picture, follower count, following count, likes count, video count, and TikTok profile URL.\n\n### How Information Is Used\nThe information is used to provide TikTok verification, Discord role management, creator recognition, Solo Growth features and leaderboard functionality within the Lampoon Discord server.\n\n### Discord Account Connection\nTikTok information is associated with the Discord account that initiates the TikTok connection process.\n\n### Data Storage\nConnection and statistics information may be stored by the application in order to provide its features and maintain the user's TikTok connection.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n### Third-Party Service\nTikTok authentication and data access are provided through TikTok's official developer platform. TikTok's own privacy policies and terms also apply to the user's use of TikTok.\n\n### Changes to This Policy\nThis Privacy Policy may be updated when the functionality of the TikTok integration changes.\n\n[Read the full Privacy Policy](${BASE_URL}/privacy/)`
   }
 ];
 
@@ -2064,8 +2256,18 @@ client.on(
         await interaction.deferReply({ ephemeral: true });
         const post = LAMPOON_FORUM_POSTS.find((item) => item.key === interaction.values[0]);
         if (!post) return interaction.editReply("❌ Unknown banner selection.");
-        const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle);
-        const embed = new EmbedBuilder().setColor(0xC48D21).setTitle(post.title).setDescription(post.body).setImage(`attachment://${post.filename}`).setFooter({ text: "Lampoon • Gold & Silver" }).setTimestamp();
+        const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle, post.bannerCategory);
+        const embed = new EmbedBuilder()
+          .setColor(0xC48D21)
+          .setAuthor({ name: post.author })
+          .setTitle(post.title)
+          .setDescription(post.body)
+          .setImage(`attachment://${post.filename}`)
+          .setFooter({
+            text: "LMP HOK Satire Creator Clan | Est. 2026",
+            iconURL: "https://cdn.discordapp.com/emojis/1542448826265243660.gif"
+          })
+          .setTimestamp();
         const buttons = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`lampoon_forum_publish:${post.key}`).setLabel("Publish this post").setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId("lampoon_forum_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
@@ -2086,9 +2288,19 @@ client.on(
         await forum.threads.fetchActive().catch(() => null);
         const existing = forum.threads.cache.find((thread) => thread.name === post.title);
         if (existing) return interaction.editReply({ content: `⚠️ A post named **${post.title}** already exists: <#${existing.id}>. Nothing new was created.`, embeds: [], files: [], components: [] });
-        const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle);
-        const embed = new EmbedBuilder().setColor(0xC48D21).setTitle(post.title).setDescription(post.body).setImage(`attachment://${post.filename}`).setFooter({ text: "Lampoon • Gold & Silver" }).setTimestamp();
-        const thread = await forum.threads.create({ name: post.title, message: { content: "**Lampoon • Official Information**", embeds: [embed], files: [{ attachment: banner, name: post.filename }] }, reason: "Publish approved Lampoon information forum post" });
+        const banner = await createLampoonForumBanner(post.bannerTitle, post.subtitle, post.bannerCategory);
+        const embed = new EmbedBuilder()
+          .setColor(0xC48D21)
+          .setAuthor({ name: post.author })
+          .setTitle(post.title)
+          .setDescription(post.body)
+          .setImage(`attachment://${post.filename}`)
+          .setFooter({
+            text: "LMP HOK Satire Creator Clan | Est. 2026",
+            iconURL: "https://cdn.discordapp.com/emojis/1542448826265243660.gif"
+          })
+          .setTimestamp();
+        const thread = await forum.threads.create({ name: post.title, message: { embeds: [embed], files: [{ attachment: banner, name: post.filename }] }, reason: "Publish approved Lampoon information forum post" });
         return interaction.editReply({ content: `✅ Published **${post.title}**: <#${thread.id}>`, embeds: [], files: [], components: [] });
       }
 
@@ -3105,7 +3317,7 @@ app.get(
                 const embed = new EmbedBuilder()
                   .setColor("#C48D21")
                   .setAuthor({ name: "Lampoon Integration" })
-                  .setTitle("🎭 lampoon Creator Recognition")
+                  .setTitle("🏆 lampoon Creator Recognition")
                   .setDescription([
                     "**OFFICIAL TIKTOK VERIFICATION**",
                     `Congratulations, <@${session.userId}>! Your Lampoon creator membership has been certified.`,
@@ -3563,17 +3775,15 @@ TikTok Integration
  );
 
  // ======================================================
- // OZVAULT STORAGE CONFIGURATION CHECK
+ // OZVAULT ENCRYPTED STORAGE HEALTH
  // ======================================================
- // This endpoint never exposes credentials. It verifies API-key access to
- // the configured bucket. Full encrypted object transfer requires OzVault's
- // unpublished @ozvault/sdk package and is not enabled by this check.
  app.get("/health/ozvault", async (req, res) => {
-   const configured = Boolean(OZVAULT_API_KEY && OZVAULT_BUCKET_ID);
+   const configured = ozVaultConfigured();
    if (!configured) {
      return res.status(503).json({
        storage: "not_configured",
        configured: false,
+       required: ["OZVAULT_API_KEY", "OZVAULT_BUCKET_ID", "OZVAULT_RECOVERY_KEY"],
        checkedAt: new Date().toISOString()
      });
    }
@@ -3583,34 +3793,30 @@ TikTok Integration
        `${OZVAULT_API_ORIGIN}/v1/objects?bucketId=${encodeURIComponent(OZVAULT_BUCKET_ID)}&limit=1`,
        {
          method: "GET",
-         headers: {
-           Authorization: `Bearer ${OZVAULT_API_KEY}`,
-           Accept: "application/json"
-         },
+         headers: { Authorization: `Bearer ${OZVAULT_API_KEY}`, Accept: "application/json" },
          signal: AbortSignal.timeout(10000)
        }
      );
-
      if (!response.ok) {
        return res.status(503).json({
-         storage: "unavailable",
-         configured: true,
-         apiStatus: response.status,
+         storage: "unavailable", configured: true, apiStatus: response.status,
+         lastBackupAt: ozVaultLastBackupAt, lastBackupStatus: ozVaultLastBackupStatus,
          checkedAt: new Date().toISOString()
        });
      }
-
      return res.status(200).json({
-       storage: "connected",
-       configured: true,
-       bucketAccess: "verified",
+       storage: "connected", configured: true, bucketAccess: "verified",
+       encryptedBackup: ozVaultLastBackupStatus,
+       lastBackupAt: ozVaultLastBackupAt,
+       lastBackupError: ozVaultLastBackupError,
        checkedAt: new Date().toISOString()
      });
    } catch (error) {
      console.error("OzVault health check failed:", error.message);
      return res.status(503).json({
-       storage: "unavailable",
-       configured: true,
+       storage: "unavailable", configured: true,
+       encryptedBackup: ozVaultLastBackupStatus,
+       lastBackupAt: ozVaultLastBackupAt,
        checkedAt: new Date().toISOString()
      });
    }
@@ -3821,6 +4027,26 @@ Lampoon Role Manager • TikTok Integration
   }
 );
 
+// Start a first backup after the app has initialized, then keep it refreshed.
+if (ozVaultConfigured()) {
+  setTimeout(() => { void performOzVaultBackup("startup"); }, 5000).unref?.();
+  setInterval(() => { void performOzVaultBackup("scheduled"); }, OZVAULT_BACKUP_INTERVAL_MS).unref?.();
+} else {
+  console.log("[OzVault] Encrypted backups disabled until API key, bucket ID, and recovery key are configured.");
+}
+
+// Best-effort final backup on graceful shutdown; local files remain the source of truth.
+let ozVaultShutdownStarted = false;
+async function ozVaultGracefulShutdown(signal) {
+  if (ozVaultShutdownStarted) return;
+  ozVaultShutdownStarted = true;
+  console.log(`[OzVault] ${signal} received; attempting final encrypted backup.`);
+  try { await performOzVaultBackup("shutdown"); } catch {}
+  process.exit(0);
+}
+process.once("SIGTERM", () => { void ozVaultGracefulShutdown("SIGTERM"); });
+process.once("SIGINT", () => { void ozVaultGracefulShutdown("SIGINT"); });
+
 // ======================================================
 // START WEB SERVER
 // ======================================================
@@ -3838,22 +4064,6 @@ app.listen(
  // ======================================================
  // DISCORD LOGIN DIAGNOSTICS
  // ======================================================
-
-fetch("https://discord.com/api/v10/gateway/bot", {
-  headers: {
-    Authorization: `Bot ${DISCORD_TOKEN}`
-  },
-  signal: AbortSignal.timeout(10000)
-})
-  .then(async (response) => {
-    console.log("Discord API test status:", response.status);
-    if (!response.ok) {
-      console.error("Discord API response:", await response.text());
-    }
-  })
-  .catch((error) => {
-    console.error("Discord API test failed:", error.name, error.message);
-  });
 
 console.log("Starting Discord login...");
 console.log("DISCORD_TOKEN configured:", Boolean(DISCORD_TOKEN));
