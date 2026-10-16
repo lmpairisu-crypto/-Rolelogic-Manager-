@@ -1182,6 +1182,18 @@ function createGrowthSVG(
       />
     </linearGradient>
 
+    <linearGradient
+      id="silver"
+      x1="0"
+      y1="0"
+      x2="1"
+      y2="1"
+    >
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="50%" stop-color="#C0C0C0" />
+      <stop offset="100%" stop-color="#777777" />
+    </linearGradient>
+
     <filter
       id="shadow"
       x="-30%"
@@ -1220,7 +1232,7 @@ function createGrowthSVG(
     height="820"
     rx="45"
     fill="none"
-    stroke="url(#gold)"
+    stroke="url(#silver)"
     stroke-width="5"
   />
 
@@ -1229,7 +1241,7 @@ function createGrowthSVG(
     cy="170"
     r="115"
     fill="#111"
-    stroke="url(#gold)"
+    stroke="url(#silver)"
     stroke-width="8"
     filter="url(#shadow)"
   />
@@ -1253,7 +1265,7 @@ function createGrowthSVG(
   <text
     x="330"
     y="125"
-    fill="#F8D85C"
+    fill="#C0C0C0"
     font-family="Arial, sans-serif"
     font-size="32"
     font-weight="700"
@@ -1290,6 +1302,17 @@ function createGrowthSVG(
     font-size="23"
   >
     Discord: ${discordName}
+  </text>
+
+  <text
+    x="330"
+    y="310"
+    fill="#C0C0C0"
+    font-family="Arial, sans-serif"
+    font-size="19"
+    letter-spacing="2"
+  >
+    PERSONAL CREATOR DOSSIER • LORD OF THE ALGORITHM (UNOFFICIAL)
   </text>
 
   <rect
@@ -1729,7 +1752,8 @@ async function createLeaderboardImage(
         height="85"
         rx="22"
         fill="#111111"
-        stroke="#5F3203"
+        stroke="#C0C0C0"
+        stroke-opacity="0.55"
         stroke-width="2"
       />
 
@@ -1895,11 +1919,11 @@ async function createLeaderboardImage(
     x="800"
     y="150"
     text-anchor="middle"
-    fill="#999999"
+    fill="#C0C0C0"
     font-family="Arial, sans-serif"
     font-size="22"
   >
-    Top 10 Lampoon TikTok Creators
+    Top 10 Lampoon TikTok Creators • A Very Serious Algorithm Council
   </text>
 
   <text x="215" y="205" fill="#F8D85C" font-family="Arial, sans-serif" font-size="20" font-weight="700">RANK</text>
@@ -3025,8 +3049,8 @@ async function createRecognitionBanner(member, connection) {
   const likes = connection.likes_count == null ? "Unavailable" : formatNumber(connection.likes_count);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
   <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#090909"/><stop offset=".55" stop-color="#1b1b1b"/><stop offset="1" stop-color="#080808"/></linearGradient><linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#8a5a12"/><stop offset=".5" stop-color="#f8d85c"/><stop offset="1" stop-color="#c48d21"/></linearGradient></defs>
-  <rect width="1600" height="900" rx="36" fill="url(#bg)"/><rect x="22" y="22" width="1556" height="856" rx="28" fill="none" stroke="url(#gold)" stroke-width="5"/><path d="M70 220 H1530" stroke="#bfc3c7" stroke-width="2" opacity=".7"/>
-  <text x="800" y="100" text-anchor="middle" fill="#cfd2d6" font-family="Arial,sans-serif" font-size="30" letter-spacing="8">OFFICIAL TIKTOK VERIFICATION</text><text x="800" y="170" text-anchor="middle" fill="#f8d85c" font-family="Arial,sans-serif" font-size="58" font-weight="bold">LAMPOON CREATOR RECOGNITION</text>
+  <rect width="1600" height="900" rx="36" fill="url(#bg)"/><rect x="22" y="22" width="1556" height="856" rx="28" fill="none" stroke="url(#gold)" stroke-width="5"/><rect x="48" y="48" width="1504" height="804" rx="22" fill="none" stroke="#C0C0C0" stroke-width="2" opacity=".65"/><path d="M70 220 H1530" stroke="#bfc3c7" stroke-width="2" opacity=".7"/>
+  <text x="800" y="100" text-anchor="middle" fill="#cfd2d6" font-family="Arial,sans-serif" font-size="30" letter-spacing="8">LAMPOON CREATOR HONORS</text><text x="800" y="170" text-anchor="middle" fill="#f8d85c" font-family="Arial,sans-serif" font-size="58" font-weight="bold">LAMPOON CREATOR RECOGNITION</text><text x="800" y="205" text-anchor="middle" fill="#C0C0C0" font-family="Arial,sans-serif" font-size="18" letter-spacing="2">A PRESTIGIOUS AWARD FROM A VERY UNPRESTIGIOUS ALGORITHM COUNCIL</text>
   ${discordData ? `<image href="${discordData}" x="180" y="290" width="250" height="250" preserveAspectRatio="xMidYMid slice"/>` : '<rect x="180" y="290" width="250" height="250" rx="125" fill="#333"/>'}
   ${tiktokData ? `<image href="${tiktokData}" x="1170" y="290" width="250" height="250" preserveAspectRatio="xMidYMid slice"/>` : '<rect x="1170" y="290" width="250" height="250" rx="125" fill="#333"/>'}
   <text x="800" y="315" text-anchor="middle" fill="#f8d85c" font-family="Arial,sans-serif" font-size="44" font-weight="bold">${escapeHTML(displayName)}</text><text x="800" y="370" text-anchor="middle" fill="#e6e6e6" font-family="Arial,sans-serif" font-size="30">@${escapeHTML(connection.username || "unavailable")}</text>
@@ -3317,10 +3341,10 @@ app.get(
                 const embed = new EmbedBuilder()
                   .setColor("#C48D21")
                   .setAuthor({ name: "Lampoon Integration" })
-                  .setTitle("🏆 lampoon Creator Recognition")
+                  .setTitle("🏆 Lampoon Creator Honors")
                   .setDescription([
-                    "**OFFICIAL TIKTOK VERIFICATION**",
-                    `Congratulations, <@${session.userId}>! Your Lampoon creator membership has been certified.`,
+                    "**LAMPOON CREATOR HONORS**",
+                    `Congratulations, <@${session.userId}>! Your Lampoon creator membership has been certified. The algorithm council is pretending this was a unanimous decision.`,
                     "",
                     "**Certification Details**",
                     `• Discord Member: <@${session.userId}>`,
