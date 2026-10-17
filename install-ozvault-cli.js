@@ -6,7 +6,8 @@ const crypto = require("node:crypto");
 
 const CLI_URL = "https://ozvault.lol/cli/ozvault-0.1.0.mjs";
 const EXPECTED_SHA256 = "0f659a112aba912996215675e2a3a02fb95f2b60a75ada460b55bfce7789ba00";
-const DEST = path.join(__dirname, "..", "ozvault.mjs");
+// This copy is run from the repository root by npm postinstall.
+const DEST = path.join(__dirname, "ozvault.mjs");
 
 function download(url, redirects = 0) {
   return new Promise((resolve, reject) => {
