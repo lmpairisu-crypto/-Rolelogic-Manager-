@@ -43,6 +43,11 @@ const SESSION_SECRET =
 // OzVault encrypted object storage. The official OzVault CLI handles the
 // provider's encryption format, resumable transfer protocol, and integrity checks.
 const OZVAULT_API_KEY = process.env.OZVAULT_API_KEY || "";
+
+// Optional AI background-removal API used by /growthcharacter set.
+// Create a key at https://remover.bg/docs and store it as a Railway secret.
+const REMOVER_BG_API_KEY = process.env.REMOVER_BG_API_KEY || "";
+const REMOVER_BG_API_URL = "https://api.remover.bg/remove-bg?format=png&shadow=none";
 const OZVAULT_API_ORIGIN = (
   process.env.OZVAULT_API_ORIGIN || "https://api.ozvault.lol"
 ).replace(/\/$/, "");
@@ -269,6 +274,7 @@ function performOzVaultBackup(reason = "scheduled") {
           if (tarResult.status !== 0) throw new Error(String(tarResult.stderr || "Could not archive character images").slice(0, 500));
           try {
             backupOneFile(archivePath, "growth-characters.tar.gz");
+            console.log(`[OzVault] Growth-character archive uploaded (${fs.statSync(archivePath).size} bytes; ${characterNames.length} character file(s)).`);
           } finally {
             try { fs.unlinkSync(archivePath); } catch {}
           }
@@ -853,32 +859,56 @@ function getCharacterFile(userId) {
 // SAVE CHARACTER
 // ======================================================
 
-async function saveCharacter(
-  userId,
-  buffer
-) {
-  const oldFile =
-    getCharacterFile(userId);
-
-  if (oldFile) {
-    fs.unlinkSync(oldFile);
+async function removeCharacterBackground(buffer, contentType = "image/png") {
+  if (!REMOVER_BG_API_KEY) {
+    const error = new Error("Background removal is not configured. Add REMOVER_BG_API_KEY in Railway Variables.");
+    error.code = "BACKGROUND_REMOVAL_NOT_CONFIGURED";
+    throw error;
   }
 
-  const filePath =
-    path.join(
-      CHARACTER_DIR,
-      `${userId}.png`
-    );
+  const form = new FormData();
+  form.append("file", new Blob([buffer], { type: contentType }), "character-image");
+  const response = await fetch(REMOVER_BG_API_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${REMOVER_BG_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(90_000),
+  });
 
-  await sharp(buffer)
-    .png()
-    .resize({
-      width: 900,
-      height: 900,
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .toFile(filePath);
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => "")).slice(0, 300);
+    throw new Error(`Background-removal service returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+  }
+
+  const output = Buffer.from(await response.arrayBuffer());
+  if (!output.length) throw new Error("Background-removal service returned an empty image.");
+
+  // Validate that the response is a usable PNG and normalize it before saving.
+  const metadata = await sharp(output).metadata();
+  if (metadata.format !== "png" || !metadata.width || !metadata.height) {
+    throw new Error("Background-removal service did not return a valid PNG.");
+  }
+  return output;
+}
+
+async function saveCharacter(userId, buffer, contentType = "image/png") {
+  // Do not remove the current character until the replacement was processed successfully.
+  const processedBuffer = await removeCharacterBackground(buffer, contentType);
+  const filePath = path.join(CHARACTER_DIR, `${userId}.png`);
+  const tempPath = `${filePath}.tmp`;
+
+  try {
+    await sharp(processedBuffer)
+      .ensureAlpha()
+      .png()
+      .resize({ width: 900, height: 900, fit: "inside", withoutEnlargement: true })
+      .toFile(tempPath);
+    // Atomic replacement protects the previous character if processing/writing fails.
+    fs.renameSync(tempPath, filePath);
+    scheduleOzVaultBackup();
+  } finally {
+    try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+  }
 
   return filePath;
 }
@@ -2840,13 +2870,18 @@ client.on(
                 await response.arrayBuffer()
               );
 
-            await saveCharacter(
-              user.id,
-              buffer
-            );
+            try {
+              await saveCharacter(user.id, buffer, attachment.contentType);
+            } catch (error) {
+              console.error("Growth character background removal failed:", error.message);
+              if (error.code === "BACKGROUND_REMOVAL_NOT_CONFIGURED") {
+                return interaction.editReply("⚠️ Automatic background removal is not configured yet. The existing character was not changed. Ask the bot administrator to add `REMOVER_BG_API_KEY` in Railway Variables.");
+              }
+              return interaction.editReply("❌ I couldn't remove the image background, so I did not replace the saved character. Please try another image or try again later.");
+            }
 
             return interaction.editReply(
-              `✅ Custom Solo Growth character saved for **${user.username}**.`
+              `✅ Background removed and custom Solo Growth character saved for **${user.username}**. An OzVault backup has been scheduled.`
             );
           }
 

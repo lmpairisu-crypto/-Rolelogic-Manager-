@@ -29,3 +29,17 @@ Backups run at startup, after JSON changes (debounced by 30 seconds), on a sched
 After deployment, check `https://YOUR-RENDER-URL/health/ozvault`. `storage: connected` means API-key bucket access worked; `encryptedBackup: success` and `lastBackupAt` indicate a successful CLI backup. Confirm the objects are visible in the existing OzVault bucket dashboard. First upload is not claimed until the CLI command succeeds.
 
 The backup CLI uses OzVault's documented encryption format; do not replace it with custom AES code. Keep the recovery key in a secure password manager/offline backup. If it is lost, encrypted backups may be unrecoverable.
+
+## Automatic Growth Character background removal
+
+`/growthcharacter set` now sends the uploaded image to the remover.bg background-removal API and saves the transparent PNG only after successful processing. Create an API key at https://remover.bg/docs and add this Railway service variable:
+
+- `REMOVER_BG_API_KEY` — secret API key for remover.bg. Do not commit it to GitHub or share it in chat.
+
+If the variable is missing or the API fails, the command reports a safe error and does not replace the member's existing character. API use may consume paid credits; check the provider's current pricing and quota before enabling it.
+
+## Character archive verification
+
+When character PNGs exist in `data/growth-characters/`, the app creates `data/.ozvault-growth-characters.tar.gz` and uploads it as `growth-characters.tar.gz`. The log reports the archive byte size and number of character files only after the CLI upload succeeds. On startup, if the character directory is empty, the app attempts to restore that named archive and extracts it into `data/`.
+
+A successful upload log confirms the CLI accepted the backup, but a true restore test should be performed against a test copy or a separate staging environment before relying on it for disaster recovery.
