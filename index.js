@@ -880,7 +880,10 @@ async function removeCharacterBackground(buffer, contentType = "image/png", onPr
   if (!normalizedBuffer.length) throw new Error("Image normalization returned an empty image.");
 
   await onProgress(30, "Removing background", "The free local AI model is processing the image. This stage has no exact percentage available.");
-  const result = await removeBackground(new Uint8Array(normalizedBuffer), {
+  // The IMG.LY Node API expects an image source such as a Blob, not a raw
+  // Uint8Array. Supplying bytes directly can produce "Unsupported format: ".
+  const imageBlob = new Blob([normalizedBuffer], { type: "image/png" });
+  const result = await removeBackground(imageBlob, {
     model: "small",
     debug: false,
     output: { format: "image/png" },
@@ -2894,7 +2897,12 @@ client.on(
               await saveCharacter(user.id, buffer, attachment.contentType, updateProgress);
               await updateProgress(100, "Success!", `Background removed and the custom character for **${user.username}** was saved. OzVault backup has been scheduled.`);
             } catch (error) {
-              console.error("Growth character background removal failed:", error.stack || error.message);
+              console.error("Growth character background removal failed:", {
+                name: error?.name || "Error",
+                code: error?.code || null,
+                message: error?.message || String(error),
+                stack: error?.stack || null,
+              });
               if (error.code === "BACKGROUND_REMOVAL_MODEL_UNAVAILABLE") {
                 return interaction.editReply({ content: "⚠️ The free local background-removal model could not load. Check the deployment logs; your saved character was not changed.", embeds: [] });
               }
