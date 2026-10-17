@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "postinstall": "node scripts/install-ozvault-cli.js"
+    "postinstall": "node ./scripts/install-ozvault-cli.js"
   },
   "dependencies": {
     "@img/sharp-wasm32": "^0.35.4",

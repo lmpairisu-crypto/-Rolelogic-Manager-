@@ -1,0 +1,10 @@
+RoleLogic Manager — Render OzVault installer path fix
+
+This archive includes scripts/install-ozvault-cli.js at the project root-relative path referenced by package.json.
+
+To fix Render's MODULE_NOT_FOUND error, upload/commit the ENTIRE contents of this archive to the repository root (the folder containing package.json and index.js), including the scripts/ directory. Do not upload package.json alone.
+
+Render build command: npm install
+Render start command: npm start
+
+The installer verifies the CLI checksum and intentionally does not fail npm install if OzVault is unavailable. In that case, encrypted backups will not work until the verified CLI is available.
