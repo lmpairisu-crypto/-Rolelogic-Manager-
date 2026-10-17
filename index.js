@@ -876,8 +876,16 @@ async function removeCharacterBackground(buffer, contentType = "image/png", onPr
   // Normalize all accepted inputs to a real PNG byte buffer before inference.
   // This avoids MIME-type inference failures from Blob objects in some Node hosts.
   await onProgress(15, "Preparing image", "Converting the upload into a supported PNG format.");
-  const normalizedBuffer = await sharp(buffer).rotate().png().toBuffer();
+  // Bound inference memory on small hosted instances. The saved character is
+  // still normalized to the existing 900px output size after inference.
+  const normalizedBuffer = await sharp(buffer)
+    .rotate()
+    .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
+    .png()
+    .toBuffer();
   if (!normalizedBuffer.length) throw new Error("Image normalization returned an empty image.");
+  const normalizedMetadata = await sharp(normalizedBuffer).metadata();
+  console.log(`[GrowthCharacter][IMG.LY] Input prepared: ${normalizedMetadata.width}x${normalizedMetadata.height}; ${(normalizedBuffer.length / 1024).toFixed(1)} KiB`);
 
   await onProgress(30, "Removing background", "The free local AI model is loading its assets and processing the image. Check Render logs for live model-download/inference progress.");
   // The IMG.LY Node API expects an image source such as a Blob, not a raw
@@ -2876,9 +2884,13 @@ client.on(
               });
             }
 
-            await interaction.deferReply({
-              ephemeral: true,
-            });
+            // Acknowledge only once. If another branch has already acknowledged
+            // this interaction, continue and update its existing response.
+            if (!interaction.deferred && !interaction.replied) {
+              await interaction.deferReply({ ephemeral: true });
+            } else {
+              console.warn("[GrowthCharacter] Interaction was already acknowledged before set processing.");
+            }
 
             const response =
               await fetch(
