@@ -879,13 +879,30 @@ async function removeCharacterBackground(buffer, contentType = "image/png", onPr
   const normalizedBuffer = await sharp(buffer).rotate().png().toBuffer();
   if (!normalizedBuffer.length) throw new Error("Image normalization returned an empty image.");
 
-  await onProgress(30, "Removing background", "The free local AI model is processing the image. This stage has no exact percentage available.");
+  await onProgress(30, "Removing background", "The free local AI model is loading its assets and processing the image. Check Render logs for live model-download/inference progress.");
   // The IMG.LY Node API expects an image source such as a Blob, not a raw
   // Uint8Array. Supplying bytes directly can produce "Unsupported format: ".
   const imageBlob = new Blob([normalizedBuffer], { type: "image/png" });
+  // Report the real model asset-download and inference progress. On its first
+  // run IMG.LY fetches roughly 40 MB of model assets; without this callback the
+  // Discord UI remains at the generic 30% stage even while downloading.
+  let lastProgressLogAt = 0;
   const result = await removeBackground(imageBlob, {
     model: "small",
-    debug: false,
+    debug: true,
+    progress: (key, current, total) => {
+      const safeCurrent = Number(current) || 0;
+      const safeTotal = Number(total) || 0;
+      const percent = safeTotal > 0
+        ? Math.max(0, Math.min(100, Math.round((safeCurrent / safeTotal) * 100)))
+        : 0;
+      const now = Date.now();
+      // Avoid flooding Render logs while retaining periodic evidence of progress.
+      if (now - lastProgressLogAt >= 1500 || safeCurrent >= safeTotal) {
+        lastProgressLogAt = now;
+        console.log(`[GrowthCharacter][IMG.LY] ${key}: ${safeCurrent}/${safeTotal} (${percent}%)`);
+      }
+    },
     output: { format: "image/png" },
   });
   const output = Buffer.from(await result.arrayBuffer());
