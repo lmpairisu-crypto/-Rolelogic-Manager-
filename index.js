@@ -44,10 +44,8 @@ const SESSION_SECRET =
 // provider's encryption format, resumable transfer protocol, and integrity checks.
 const OZVAULT_API_KEY = process.env.OZVAULT_API_KEY || "";
 
-// Optional AI background-removal API used by /growthcharacter set.
-// Create a key at https://remover.bg/docs and store it as a Railway secret.
-const REMOVER_BG_API_KEY = process.env.REMOVER_BG_API_KEY || "";
-const REMOVER_BG_API_URL = "https://api.remover.bg/remove-bg?format=png&shadow=none";
+// Free local-model background removal for /growthcharacter set.
+// The first use downloads the small ONNX model; no paid API key is required.
 const OZVAULT_API_ORIGIN = (
   process.env.OZVAULT_API_ORIGIN || "https://api.ozvault.lol"
 ).replace(/\/$/, "");
@@ -860,33 +858,29 @@ function getCharacterFile(userId) {
 // ======================================================
 
 async function removeCharacterBackground(buffer, contentType = "image/png") {
-  if (!REMOVER_BG_API_KEY) {
-    const error = new Error("Background removal is not configured. Add REMOVER_BG_API_KEY in Railway Variables.");
-    error.code = "BACKGROUND_REMOVAL_NOT_CONFIGURED";
-    throw error;
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error("No image data was supplied for background removal.");
   }
 
-  const form = new FormData();
-  form.append("file", new Blob([buffer], { type: contentType }), "character-image");
-  const response = await fetch(REMOVER_BG_API_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${REMOVER_BG_API_KEY}` },
-    body: form,
-    signal: AbortSignal.timeout(90_000),
-  });
-
-  if (!response.ok) {
-    const detail = (await response.text().catch(() => "")).slice(0, 300);
-    throw new Error(`Background-removal service returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+  // Load the model lazily so normal bot startup does not pay the model's
+  // initialization cost. Processing runs locally in this Node.js service.
+  let removeBackground;
+  try {
+    ({ removeBackground } = await import("@imgly/background-removal-node"));
+  } catch (error) {
+    const wrapped = new Error(`Local background-removal package could not load: ${error.message}`);
+    wrapped.code = "BACKGROUND_REMOVAL_MODEL_UNAVAILABLE";
+    throw wrapped;
   }
 
-  const output = Buffer.from(await response.arrayBuffer());
-  if (!output.length) throw new Error("Background-removal service returned an empty image.");
+  const result = await removeBackground(buffer, { model: "small", debug: false });
+  const output = Buffer.from(await result.arrayBuffer());
+  if (!output.length) throw new Error("Local background-removal model returned an empty image.");
 
-  // Validate that the response is a usable PNG and normalize it before saving.
+  // Validate the output before allowing saveCharacter() to replace the old file.
   const metadata = await sharp(output).metadata();
-  if (metadata.format !== "png" || !metadata.width || !metadata.height) {
-    throw new Error("Background-removal service did not return a valid PNG.");
+  if (metadata.format !== "png" || !metadata.width || !metadata.height || !metadata.hasAlpha) {
+    throw new Error("Local background-removal model did not return a transparent PNG.");
   }
   return output;
 }
@@ -2874,8 +2868,8 @@ client.on(
               await saveCharacter(user.id, buffer, attachment.contentType);
             } catch (error) {
               console.error("Growth character background removal failed:", error.message);
-              if (error.code === "BACKGROUND_REMOVAL_NOT_CONFIGURED") {
-                return interaction.editReply("⚠️ Automatic background removal is not configured yet. The existing character was not changed. Ask the bot administrator to add `REMOVER_BG_API_KEY` in Railway Variables.");
+              if (error.code === "BACKGROUND_REMOVAL_MODEL_UNAVAILABLE") {
+                return interaction.editReply("⚠️ The free local background-removal model could not load. Please check the Railway deployment logs; your saved character was not changed.");
               }
               return interaction.editReply("❌ I couldn't remove the image background, so I did not replace the saved character. Please try another image or try again later.");
             }
