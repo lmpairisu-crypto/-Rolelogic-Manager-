@@ -857,7 +857,7 @@ function getCharacterFile(userId) {
 // SAVE CHARACTER
 // ======================================================
 
-async function removeCharacterBackground(buffer, contentType = "image/png") {
+async function removeCharacterBackground(buffer, contentType = "image/png", onProgress = async () => {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new Error("No image data was supplied for background removal.");
   }
@@ -873,28 +873,21 @@ async function removeCharacterBackground(buffer, contentType = "image/png") {
     throw wrapped;
   }
 
-  // IMG.LY's Node package can fail to infer the image MIME type from a raw
-  // Buffer in some deployment environments. Give the input an explicit MIME
-  // type so the decoder can reliably identify PNG/JPEG/WebP data.
-  const allowedContentTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
-  let inputContentType = allowedContentTypes.has(contentType) ? contentType : "";
-  if (!inputContentType) {
-    const inputMetadata = await sharp(buffer).metadata();
-    const formatToMime = { png: "image/png", jpeg: "image/jpeg", jpg: "image/jpeg", webp: "image/webp" };
-    inputContentType = formatToMime[inputMetadata.format] || "";
-  }
-  if (!inputContentType) {
-    throw new Error("Unsupported input image format; please upload a PNG, JPG, or WEBP image.");
-  }
+  // Normalize all accepted inputs to a real PNG byte buffer before inference.
+  // This avoids MIME-type inference failures from Blob objects in some Node hosts.
+  await onProgress(15, "Preparing image", "Converting the upload into a supported PNG format.");
+  const normalizedBuffer = await sharp(buffer).rotate().png().toBuffer();
+  if (!normalizedBuffer.length) throw new Error("Image normalization returned an empty image.");
 
-  const typedImage = new Blob([new Uint8Array(buffer)], { type: inputContentType });
-  const result = await removeBackground(typedImage, {
+  await onProgress(30, "Removing background", "The free local AI model is processing the image. This stage has no exact percentage available.");
+  const result = await removeBackground(new Uint8Array(normalizedBuffer), {
     model: "small",
     debug: false,
     output: { format: "image/png" },
   });
   const output = Buffer.from(await result.arrayBuffer());
   if (!output.length) throw new Error("Local background-removal model returned an empty image.");
+  await onProgress(80, "Checking transparent PNG", "Background removal finished; validating the output.");
 
   // Validate the output before allowing saveCharacter() to replace the old file.
   const metadata = await sharp(output).metadata();
@@ -904,9 +897,9 @@ async function removeCharacterBackground(buffer, contentType = "image/png") {
   return output;
 }
 
-async function saveCharacter(userId, buffer, contentType = "image/png") {
+async function saveCharacter(userId, buffer, contentType = "image/png", onProgress = async () => {}) {
   // Do not remove the current character until the replacement was processed successfully.
-  const processedBuffer = await removeCharacterBackground(buffer, contentType);
+  const processedBuffer = await removeCharacterBackground(buffer, contentType, onProgress);
   const filePath = path.join(CHARACTER_DIR, `${userId}.png`);
   const tempPath = `${filePath}.tmp`;
 
@@ -2883,19 +2876,32 @@ client.on(
                 await response.arrayBuffer()
               );
 
+            const progressBar = (percent) => {
+              const filled = Math.round(percent / 10);
+              return `${"🟨".repeat(filled)}${"⬛".repeat(10 - filled)} **${percent}%**`;
+            };
+            const progressEmbed = (percent, stage, detail) => new EmbedBuilder()
+              .setColor(0xC48D21)
+              .setTitle("🎨 Lampoon Growth Character")
+              .setDescription(`${progressBar(percent)}\n\n**${stage}**\n${detail}`)
+              .setFooter({ text: "Free local background removal • Your existing character is protected until success" });
+            const updateProgress = async (percent, stage, detail) => {
+              await interaction.editReply({ embeds: [progressEmbed(percent, stage, detail)] });
+            };
+
+            await updateProgress(5, "Image received", "Download complete. Preparing to remove the background…");
             try {
-              await saveCharacter(user.id, buffer, attachment.contentType);
+              await saveCharacter(user.id, buffer, attachment.contentType, updateProgress);
+              await updateProgress(100, "Success!", `Background removed and the custom character for **${user.username}** was saved. OzVault backup has been scheduled.`);
             } catch (error) {
               console.error("Growth character background removal failed:", error.stack || error.message);
               if (error.code === "BACKGROUND_REMOVAL_MODEL_UNAVAILABLE") {
-                return interaction.editReply("⚠️ The free local background-removal model could not load. Please check the Railway deployment logs; your saved character was not changed.");
+                return interaction.editReply({ content: "⚠️ The free local background-removal model could not load. Check the deployment logs; your saved character was not changed.", embeds: [] });
               }
-              return interaction.editReply("❌ I couldn't remove the image background, so I did not replace the saved character. Please try another image or try again later.");
+              return interaction.editReply({ content: "❌ Background removal failed, so the saved character was not replaced. Check the deployment logs for the exact error, then try again.", embeds: [] });
             }
 
-            return interaction.editReply(
-              `✅ Background removed and custom Solo Growth character saved for **${user.username}**. An OzVault backup has been scheduled.`
-            );
+            return;
           }
 
           // --------------------------------------------
