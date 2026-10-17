@@ -873,7 +873,26 @@ async function removeCharacterBackground(buffer, contentType = "image/png") {
     throw wrapped;
   }
 
-  const result = await removeBackground(buffer, { model: "small", debug: false });
+  // IMG.LY's Node package can fail to infer the image MIME type from a raw
+  // Buffer in some deployment environments. Give the input an explicit MIME
+  // type so the decoder can reliably identify PNG/JPEG/WebP data.
+  const allowedContentTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+  let inputContentType = allowedContentTypes.has(contentType) ? contentType : "";
+  if (!inputContentType) {
+    const inputMetadata = await sharp(buffer).metadata();
+    const formatToMime = { png: "image/png", jpeg: "image/jpeg", jpg: "image/jpeg", webp: "image/webp" };
+    inputContentType = formatToMime[inputMetadata.format] || "";
+  }
+  if (!inputContentType) {
+    throw new Error("Unsupported input image format; please upload a PNG, JPG, or WEBP image.");
+  }
+
+  const typedImage = new Blob([new Uint8Array(buffer)], { type: inputContentType });
+  const result = await removeBackground(typedImage, {
+    model: "small",
+    debug: false,
+    output: { format: "image/png" },
+  });
   const output = Buffer.from(await result.arrayBuffer());
   if (!output.length) throw new Error("Local background-removal model returned an empty image.");
 
@@ -2867,7 +2886,7 @@ client.on(
             try {
               await saveCharacter(user.id, buffer, attachment.contentType);
             } catch (error) {
-              console.error("Growth character background removal failed:", error.message);
+              console.error("Growth character background removal failed:", error.stack || error.message);
               if (error.code === "BACKGROUND_REMOVAL_MODEL_UNAVAILABLE") {
                 return interaction.editReply("⚠️ The free local background-removal model could not load. Please check the Railway deployment logs; your saved character was not changed.");
               }
