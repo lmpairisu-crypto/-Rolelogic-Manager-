@@ -1,19 +1,20 @@
-# Free local growth-character background removal fix
+# Transparent PNG bypass for growth-character uploads
 
-This update keeps the existing Discord bot features and OzVault backup/restore code, and adjusts `/growthcharacter set` to reduce inference memory use.
+This update preserves the free local IMG.LY background-removal fallback while allowing an already-transparent PNG (for example, one prepared manually in ChatGPT) to skip local AI inference.
 
 ## Changes
-- Keeps the free local `@imgly/background-removal-node` model; no paid API key is required.
-- Resizes the image to a maximum 512 x 512 before AI inference to reduce memory use on small hosted instances.
-- Logs the prepared input dimensions and size, in addition to model download/inference progress.
-- Avoids calling `deferReply()` again if the growth-character interaction was already acknowledged.
-- Keeps the existing saved character until processing and writing the replacement succeed.
+- Checks that an image has actual transparent pixels; an alpha channel alone is not enough.
+- If real transparency is present, skips IMG.LY inference and validates transparency before saving.
+- If the image is not already transparent, the existing IMG.LY local-removal path remains in place. That path may still be terminated by memory limits on the current Render instance.
+- Preserves the existing temporary-file/atomic replacement flow and OzVault backup scheduling.
+- Preserves the OzVault child-process `OZVAULT_API_URL` mapping to the configured API origin.
+- No secrets or new environment variables are required.
 
-## Deployment
-1. Replace the repository files with the contents of this ZIP, or at minimum replace `index.js` and `package.json` and remove the old `package-lock.json`.
-2. Set the Render build command to `npm install` (not `npm ci`, because this ZIP intentionally omits the old stale lockfile that did not include the IMG.LY dependency).
-3. Keep the existing environment variables unchanged.
-4. Deploy, then test `/growthcharacter set` with a small image first.
-5. In Render logs, look for `[GrowthCharacter][IMG.LY] Input prepared`, model progress, and a completion/error message.
+## Deployment notes
+1. Back up the currently deployed source before replacing files.
+2. Review the included `index.js` against the current GitHub source before deployment; do not overwrite newer unrelated project changes without merging them.
+3. Run `node --check index.js` and test with a PNG that has actual transparent pixels.
+4. Confirm the progress message changes to `Transparent PNG detected` and the character saves successfully.
+5. Confirm Discord readiness and OzVault backups in Render logs.
 
-The 512px resize is a memory-reduction measure, not a guarantee. If the host still terminates inference with `Killed`, the service may need more available memory or a different inference approach. Keep your existing OzVault backup/restore settings; this patch does not change them.
+A PNG with a white background or an alpha channel whose pixels are all opaque will not bypass the model. The image must contain real transparent pixels.

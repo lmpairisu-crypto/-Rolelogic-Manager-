@@ -926,9 +926,35 @@ async function removeCharacterBackground(buffer, contentType = "image/png", onPr
   return output;
 }
 
+async function imageHasRealTransparency(buffer) {
+  // A PNG may have an alpha channel while every pixel is still fully opaque.
+  // Only skip local AI inference when the uploaded image contains transparent pixels.
+  const metadata = await sharp(buffer).metadata();
+  if (!metadata.hasAlpha || !metadata.width || !metadata.height) return false;
+  const stats = await sharp(buffer).stats();
+  const alphaChannel = stats.channels[metadata.channels - 1];
+  return Boolean(alphaChannel && alphaChannel.min < 255);
+}
+
 async function saveCharacter(userId, buffer, contentType = "image/png", onProgress = async () => {}) {
   // Do not remove the current character until the replacement was processed successfully.
-  const processedBuffer = await removeCharacterBackground(buffer, contentType, onProgress);
+  await onProgress(10, "Checking image", "Checking whether the PNG already has a transparent background.");
+  let processedBuffer;
+  if (await imageHasRealTransparency(buffer)) {
+    // ChatGPT-prepared transparent PNGs can be saved without running the memory-heavy IMG.LY model.
+    await onProgress(30, "Transparent PNG detected", "Real transparency found. Skipping local AI background removal.");
+    processedBuffer = await sharp(buffer).rotate().png().toBuffer();
+    if (!processedBuffer.length) throw new Error("Transparent PNG could not be prepared for saving.");
+    await onProgress(80, "Checking transparent PNG", "Validating the existing transparent background.");
+    const metadata = await sharp(processedBuffer).metadata();
+    const stats = await sharp(processedBuffer).stats();
+    const alphaChannel = metadata.hasAlpha ? stats.channels[metadata.channels - 1] : null;
+    if (metadata.format !== "png" || !metadata.width || !metadata.height || !alphaChannel || alphaChannel.min >= 255) {
+      throw new Error("Uploaded PNG did not retain real transparency after image preparation.");
+    }
+  } else {
+    processedBuffer = await removeCharacterBackground(buffer, contentType, onProgress);
+  }
   const filePath = path.join(CHARACTER_DIR, `${userId}.png`);
   const tempPath = `${filePath}.tmp`;
 
