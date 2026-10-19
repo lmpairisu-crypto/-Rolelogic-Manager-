@@ -53,6 +53,9 @@ const OZVAULT_BUCKET_ID = process.env.OZVAULT_BUCKET_ID || "";
 const OZVAULT_RECOVERY_KEY =
   process.env.OZVAULT_RECOVERY_KEY || process.env.OZVAULT_VAULT_KEY || "";
 const OZVAULT_CLI_PATH = path.join(__dirname, "ozvault.mjs");
+// Must match the SHA-256 pinned in install-ozvault-cli.js.
+const OZVAULT_CLI_EXPECTED_SHA256 = "0f659a112aba912996215675e2a3a02fb95f2b60a75ada460b55bfce7789ba00";
+let ozVaultCliVerified = false;
 const OZVAULT_BACKUP_KEEP = Math.max(2, Math.min(30, Number(process.env.OZVAULT_BACKUP_KEEP) || 7));
 const OZVAULT_BACKUP_INTERVAL_MS = Math.max(60_000, Number(process.env.OZVAULT_BACKUP_INTERVAL_MS) || 10 * 60 * 1000);
 let ozVaultLastBackupAt = null;
@@ -172,9 +175,31 @@ function ozVaultChildEnv() {
   };
 }
 
+function verifyOzVaultCli() {
+  ozVaultCliVerified = false;
+  try {
+    if (!fs.existsSync(OZVAULT_CLI_PATH) || !fs.statSync(OZVAULT_CLI_PATH).isFile()) {
+      throw new Error("OzVault CLI file is missing.");
+    }
+    const actualSha256 = crypto.createHash("sha256")
+      .update(fs.readFileSync(OZVAULT_CLI_PATH))
+      .digest("hex");
+    if (actualSha256 !== OZVAULT_CLI_EXPECTED_SHA256) {
+      throw new Error("OzVault CLI SHA-256 mismatch; refusing to execute an unverified CLI.");
+    }
+    ozVaultCliVerified = true;
+    console.log("[OzVault] CLI exists and SHA-256 verification passed.");
+    return true;
+  } catch (error) {
+    console.error(`[OzVault] CLI verification failed: ${error.message}`);
+    console.warn("[OzVault] Discord features will continue, but OzVault restore/backup operations are disabled until the verified CLI is installed.");
+    return false;
+  }
+}
+
 function runOzVaultCli(args, timeout = 5 * 60 * 1000) {
-  if (!fs.existsSync(OZVAULT_CLI_PATH)) {
-    throw new Error("OzVault CLI is missing; the verified postinstall download may have failed.");
+  if (!ozVaultCliVerified) {
+    throw new Error("OzVault CLI has not passed startup SHA-256 verification; refusing to execute it.");
   }
   const { spawnSync } = require("node:child_process");
   const result = spawnSync(process.execPath, [OZVAULT_CLI_PATH, ...args], {
@@ -303,6 +328,10 @@ function scheduleOzVaultBackup() {
   }, 30_000);
   if (typeof ozVaultBackupTimer.unref === "function") ozVaultBackupTimer.unref();
 }
+
+// Verify the installed CLI on every process start before any OzVault restore/backup use.
+// A failed CLI check must not prevent the Discord bot from starting.
+verifyOzVaultCli();
 
 // Recover only absent files before loadJSON creates empty defaults.
 restoreOzVaultDataBeforeLoading();
@@ -2794,7 +2823,6 @@ client.on(
               "member"
             );
 
-          
           // --------------------------------------------
           // SET
           // --------------------------------------------
@@ -2823,32 +2851,13 @@ client.on(
               });
             }
 
-                        // Acknowledge the interaction only once.
-            if (interaction.deferred || interaction.replied) {
-              console.warn(
-                "[GrowthCharacter] Interaction already acknowledged before deferReply.",
-                {
-                  interactionId: interaction.id,
-                  deferred: interaction.deferred,
-                  replied: interaction.replied,
-                }
-              );
-              return;
-            }
-
-            try {
+            // Acknowledge only once. If another branch has already acknowledged
+            // this interaction, continue and update its existing response.
+            if (!interaction.deferred && !interaction.replied) {
               await interaction.deferReply({ ephemeral: true });
-            } catch (error) {
-              console.error(
-                "[GrowthCharacter] Failed to acknowledge interaction:",
-                {
-                  interactionId: interaction.id,
-                  code: error.code,
-                  message: error.message,
-                }
-              );
-              return;
-                }
+            } else {
+              console.warn("[GrowthCharacter] Interaction was already acknowledged before set processing.");
+            }
 
             const response =
               await fetch(
@@ -3391,9 +3400,9 @@ app.get(
                 const embed = new EmbedBuilder()
                   .setColor("#C48D21")
                   .setAuthor({ name: "Lampoon Integration" })
-                  .setTitle("🎭 Lampoon Certified Member")
+                  .setTitle("🏆 Lampoon Creator Honors")
                   .setDescription([
-                    "**LAMPOON MEMBERSHIP**",
+                    "**LAMPOON CREATOR HONORS**",
                     `Congratulations, <@${session.userId}>! Your Lampoon creator membership has been certified. The algorithm council is pretending this was a unanimous decision.`,
                     "",
                     "**Certification Details**",
