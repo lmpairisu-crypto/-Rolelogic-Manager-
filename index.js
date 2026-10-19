@@ -44,8 +44,7 @@ const SESSION_SECRET =
 // provider's encryption format, resumable transfer protocol, and integrity checks.
 const OZVAULT_API_KEY = process.env.OZVAULT_API_KEY || "";
 
-// Free local-model background removal for /growthcharacter set.
-// The first use downloads the small ONNX model; no paid API key is required.
+// /growthcharacter set accepts manually edited transparent PNGs only.
 const OZVAULT_API_ORIGIN = (
   process.env.OZVAULT_API_ORIGIN || "https://api.ozvault.lol"
 ).replace(/\/$/, "");
@@ -858,113 +857,37 @@ function getCharacterFile(userId) {
 // SAVE CHARACTER
 // ======================================================
 
-async function removeCharacterBackground(buffer, contentType = "image/png", onProgress = async () => {}) {
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
-    throw new Error("No image data was supplied for background removal.");
-  }
-
-  // Load the model lazily so normal bot startup does not pay the model's
-  // initialization cost. Processing runs locally in this Node.js service.
-  let removeBackground;
-  try {
-    ({ removeBackground } = await import("@imgly/background-removal-node"));
-  } catch (error) {
-    const wrapped = new Error(`Local background-removal package could not load: ${error.message}`);
-    wrapped.code = "BACKGROUND_REMOVAL_MODEL_UNAVAILABLE";
-    throw wrapped;
-  }
-
-  // Normalize all accepted inputs to a real PNG byte buffer before inference.
-  // This avoids MIME-type inference failures from Blob objects in some Node hosts.
-  await onProgress(15, "Preparing image", "Converting the upload into a supported PNG format.");
-  // Bound inference memory on small hosted instances. The saved character is
-  // still normalized to the existing 900px output size after inference.
-  const normalizedBuffer = await sharp(buffer)
-    .rotate()
-    .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
-    .png()
-    .toBuffer();
-  if (!normalizedBuffer.length) throw new Error("Image normalization returned an empty image.");
-  const normalizedMetadata = await sharp(normalizedBuffer).metadata();
-  console.log(`[GrowthCharacter][IMG.LY] Input prepared: ${normalizedMetadata.width}x${normalizedMetadata.height}; ${(normalizedBuffer.length / 1024).toFixed(1)} KiB`);
-
-  await onProgress(30, "Removing background", "The free local AI model is loading its assets and processing the image. Check Render logs for live model-download/inference progress.");
-  // The IMG.LY Node API expects an image source such as a Blob, not a raw
-  // Uint8Array. Supplying bytes directly can produce "Unsupported format: ".
-  const imageBlob = new Blob([normalizedBuffer], { type: "image/png" });
-  // Report the real model asset-download and inference progress. On its first
-  // run IMG.LY fetches roughly 40 MB of model assets; without this callback the
-  // Discord UI remains at the generic 30% stage even while downloading.
-  let lastProgressLogAt = 0;
-  const result = await removeBackground(imageBlob, {
-    model: "small",
-    debug: true,
-    progress: (key, current, total) => {
-      const safeCurrent = Number(current) || 0;
-      const safeTotal = Number(total) || 0;
-      const percent = safeTotal > 0
-        ? Math.max(0, Math.min(100, Math.round((safeCurrent / safeTotal) * 100)))
-        : 0;
-      const now = Date.now();
-      // Avoid flooding Render logs while retaining periodic evidence of progress.
-      if (now - lastProgressLogAt >= 1500 || safeCurrent >= safeTotal) {
-        lastProgressLogAt = now;
-        console.log(`[GrowthCharacter][IMG.LY] ${key}: ${safeCurrent}/${safeTotal} (${percent}%)`);
-      }
-    },
-    output: { format: "image/png" },
-  });
-  const output = Buffer.from(await result.arrayBuffer());
-  if (!output.length) throw new Error("Local background-removal model returned an empty image.");
-  await onProgress(80, "Checking transparent PNG", "Background removal finished; validating the output.");
-
-  // Validate the output before allowing saveCharacter() to replace the old file.
-  const metadata = await sharp(output).metadata();
-  if (metadata.format !== "png" || !metadata.width || !metadata.height || !metadata.hasAlpha) {
-    throw new Error("Local background-removal model did not return a transparent PNG.");
-  }
-  return output;
-}
-
 async function imageHasRealTransparency(buffer) {
-  // A PNG may have an alpha channel while every pixel is still fully opaque.
-  // Only skip local AI inference when the uploaded image contains transparent pixels.
+  // A PNG can contain an alpha channel while every pixel remains opaque.
+  // Require at least one genuinely transparent pixel before accepting it.
   const metadata = await sharp(buffer).metadata();
-  if (!metadata.hasAlpha || !metadata.width || !metadata.height) return false;
+  if (metadata.format !== "png" || !metadata.hasAlpha || !metadata.width || !metadata.height) return false;
   const stats = await sharp(buffer).stats();
   const alphaChannel = stats.channels[metadata.channels - 1];
   return Boolean(alphaChannel && alphaChannel.min < 255);
 }
 
-async function saveCharacter(userId, buffer, contentType = "image/png", onProgress = async () => {}) {
-  // Do not remove the current character until the replacement was processed successfully.
-  await onProgress(10, "Checking image", "Checking whether the PNG already has a transparent background.");
-  let processedBuffer;
-  if (await imageHasRealTransparency(buffer)) {
-    // ChatGPT-prepared transparent PNGs can be saved without running the memory-heavy IMG.LY model.
-    await onProgress(30, "Transparent PNG detected", "Real transparency found. Skipping local AI background removal.");
-    processedBuffer = await sharp(buffer).rotate().png().toBuffer();
-    if (!processedBuffer.length) throw new Error("Transparent PNG could not be prepared for saving.");
-    await onProgress(80, "Checking transparent PNG", "Validating the existing transparent background.");
-    const metadata = await sharp(processedBuffer).metadata();
-    const stats = await sharp(processedBuffer).stats();
-    const alphaChannel = metadata.hasAlpha ? stats.channels[metadata.channels - 1] : null;
-    if (metadata.format !== "png" || !metadata.width || !metadata.height || !alphaChannel || alphaChannel.min >= 255) {
-      throw new Error("Uploaded PNG did not retain real transparency after image preparation.");
-    }
-  } else {
-    processedBuffer = await removeCharacterBackground(buffer, contentType, onProgress);
+async function saveCharacter(userId, buffer) {
+  // Manual-edit workflow only: never run AI/background removal here.
+  // Reject anything that is not a PNG with genuine transparent pixels.
+  if (!(await imageHasRealTransparency(buffer))) {
+    throw new Error("TRANSPARENT_PNG_REQUIRED");
   }
+
+  const processedBuffer = await sharp(buffer).rotate().png().toBuffer();
+  if (!(await imageHasRealTransparency(processedBuffer))) {
+    throw new Error("TRANSPARENT_PNG_REQUIRED");
+  }
+
   const filePath = path.join(CHARACTER_DIR, `${userId}.png`);
   const tempPath = `${filePath}.tmp`;
 
   try {
     await sharp(processedBuffer)
-      .ensureAlpha()
-      .png()
       .resize({ width: 900, height: 900, fit: "inside", withoutEnlargement: true })
+      .png()
       .toFile(tempPath);
-    // Atomic replacement protects the previous character if processing/writing fails.
+    // Atomic replacement protects the previous character if writing fails.
     fs.renameSync(tempPath, filePath);
     scheduleOzVaultBackup();
   } finally {
@@ -2892,21 +2815,9 @@ client.on(
               });
             }
 
-            const allowed =
-              [
-                "image/png",
-                "image/jpeg",
-                "image/webp",
-              ];
-
-            if (
-              !allowed.includes(
-                attachment.contentType
-              )
-            ) {
+            if (attachment.contentType !== "image/png" || !attachment.name?.toLowerCase().endsWith(".png")) {
               return interaction.reply({
-                content:
-                  "❌ Please use PNG, JPG, or WEBP.",
+                content: "❌ Please upload a **transparent PNG**. Edit/remove the background yourself before uploading.",
                 ephemeral: true,
               });
             }
@@ -2935,34 +2846,35 @@ client.on(
                 await response.arrayBuffer()
               );
 
-            const progressBar = (percent) => {
-              const filled = Math.round(percent / 10);
-              return `${"🟨".repeat(filled)}${"⬛".repeat(10 - filled)} **${percent}%**`;
-            };
-            const progressEmbed = (percent, stage, detail) => new EmbedBuilder()
-              .setColor(0xC48D21)
-              .setTitle("🎨 Lampoon Growth Character")
-              .setDescription(`${progressBar(percent)}\n\n**${stage}**\n${detail}`)
-              .setFooter({ text: "Free local background removal • Your existing character is protected until success" });
-            const updateProgress = async (percent, stage, detail) => {
-              await interaction.editReply({ embeds: [progressEmbed(percent, stage, detail)] });
-            };
-
-            await updateProgress(5, "Image received", "Download complete. Preparing to remove the background…");
+            let savedCharacterPath;
             try {
-              await saveCharacter(user.id, buffer, attachment.contentType, updateProgress);
-              await updateProgress(100, "Success!", `Background removed and the custom character for **${user.username}** was saved. OzVault backup has been scheduled.`);
+              savedCharacterPath = await saveCharacter(user.id, buffer);
             } catch (error) {
-              console.error("Growth character background removal failed:", {
+              if (error.message === "TRANSPARENT_PNG_REQUIRED") {
+                return interaction.editReply({ content: "❌ This image does not contain real transparency. Please remove the background yourself, export it as a transparent PNG, and upload it again. Your existing character was not changed.", embeds: [] });
+              }
+              console.error("Growth character save failed:", {
                 name: error?.name || "Error",
-                code: error?.code || null,
                 message: error?.message || String(error),
                 stack: error?.stack || null,
               });
-              if (error.code === "BACKGROUND_REMOVAL_MODEL_UNAVAILABLE") {
-                return interaction.editReply({ content: "⚠️ The free local background-removal model could not load. Check the deployment logs; your saved character was not changed.", embeds: [] });
+              return interaction.editReply({ content: "❌ The transparent PNG could not be saved, so the existing character was not changed. Check the deployment logs and try again.", embeds: [] });
+            }
+
+            // Dyno-style public success announcement with the saved transparent PNG.
+            try {
+              if (!interaction.channel || typeof interaction.channel.send !== "function") {
+                throw new Error("The command channel cannot publish messages.");
               }
-              return interaction.editReply({ content: "❌ Background removal failed, so the saved character was not replaced. Check the deployment logs for the exact error, then try again.", embeds: [] });
+              await interaction.channel.send({
+                content: `✅ Created character for **${user.username}** successfully!`,
+                files: [new AttachmentBuilder(savedCharacterPath, { name: `${user.username}-character.png` })],
+                allowedMentions: { parse: [] },
+              });
+              return interaction.editReply({ content: `✅ Created the Solo Growth character for **${user.username}** successfully. The transparent PNG was saved and the OzVault backup has been scheduled.`, embeds: [] });
+            } catch (error) {
+              console.error("Growth character saved but public announcement failed:", error);
+              return interaction.editReply({ content: `⚠️ The Solo Growth character for **${user.username}** was saved and OzVault backup was scheduled, but the public success announcement failed. Check the bot's Send Messages and Attach Files permissions.`, embeds: [] });
             }
 
             return;
