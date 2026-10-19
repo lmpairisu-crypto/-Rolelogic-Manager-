@@ -3371,9 +3371,9 @@ app.get(
                 const embed = new EmbedBuilder()
                   .setColor("#C48D21")
                   .setAuthor({ name: "Lampoon Integration" })
-                  .setTitle("🏆 Lampoon Creator Honors")
+                  .setTitle("🎭 Lampoon Certified Member")
                   .setDescription([
-                    "**LAMPOON CREATOR HONORS**",
+                    "**LAMPOON MEMBERSHIP**",
                     `Congratulations, <@${session.userId}>! Your Lampoon creator membership has been certified. The algorithm council is pretending this was a unanimous decision.`,
                     "",
                     "**Certification Details**",
