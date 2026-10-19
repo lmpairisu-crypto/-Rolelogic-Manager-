@@ -2794,6 +2794,7 @@ client.on(
               "member"
             );
 
+          
           // --------------------------------------------
           // SET
           // --------------------------------------------
@@ -2822,13 +2823,32 @@ client.on(
               });
             }
 
-            // Acknowledge only once. If another branch has already acknowledged
-            // this interaction, continue and update its existing response.
-            if (!interaction.deferred && !interaction.replied) {
-              await interaction.deferReply({ ephemeral: true });
-            } else {
-              console.warn("[GrowthCharacter] Interaction was already acknowledged before set processing.");
+                        // Acknowledge the interaction only once.
+            if (interaction.deferred || interaction.replied) {
+              console.warn(
+                "[GrowthCharacter] Interaction already acknowledged before deferReply.",
+                {
+                  interactionId: interaction.id,
+                  deferred: interaction.deferred,
+                  replied: interaction.replied,
+                }
+              );
+              return;
             }
+
+            try {
+              await interaction.deferReply({ ephemeral: true });
+            } catch (error) {
+              console.error(
+                "[GrowthCharacter] Failed to acknowledge interaction:",
+                {
+                  interactionId: interaction.id,
+                  code: error.code,
+                  message: error.message,
+                }
+              );
+              return;
+                }
 
             const response =
               await fetch(
