@@ -1,20 +1,32 @@
-# Transparent PNG bypass for growth-character uploads
+Transparent PNG Upload for Growth Characters
 
-This update preserves the free local IMG.LY background-removal fallback while allowing an already-transparent PNG (for example, one prepared manually in ChatGPT) to skip local AI inference.
+This update allows members to upload manually prepared transparent PNG images for their Solo Growth characters.
 
-## Changes
-- Checks that an image has actual transparent pixels; an alpha channel alone is not enough.
-- If real transparency is present, skips IMG.LY inference and validates transparency before saving.
-- If the image is not already transparent, the existing IMG.LY local-removal path remains in place. That path may still be terminated by memory limits on the current Render instance.
-- Preserves the existing temporary-file/atomic replacement flow and OzVault backup scheduling.
-- Preserves the OzVault child-process `OZVAULT_API_URL` mapping to the configured API origin.
-- No secrets or new environment variables are required.
+Changes
 
-## Deployment notes
-1. Back up the currently deployed source before replacing files.
-2. Review the included `index.js` against the current GitHub source before deployment; do not overwrite newer unrelated project changes without merging them.
-3. Run `node --check index.js` and test with a PNG that has actual transparent pixels.
-4. Confirm the progress message changes to `Transparent PNG detected` and the character saves successfully.
-5. Confirm Discord readiness and OzVault backups in Render logs.
+- Checks that the uploaded image is a PNG.
+- Verifies that the image contains actual transparent pixels; an alpha channel alone is not enough.
+- Rejects images with white backgrounds or fully opaque pixels.
+- Preserves the existing character if the uploaded image fails transparency validation or cannot be saved successfully.
+- Resizes valid character images to fit within 900 × 900 pixels while preserving transparency.
+- Uses temporary-file processing and atomic replacement to protect existing character files.
+- Schedules OzVault backups after a successful character save.
+- Preserves the public Discord success announcement, including the saved character PNG attachment.
 
-A PNG with a white background or an alpha channel whose pixels are all opaque will not bypass the model. The image must contain real transparent pixels.
+Background Removal
+
+Background removal must be completed manually before uploading. Use an image editor or another tool to remove the background and export the image as a transparent PNG.
+
+The bot does not automatically remove image backgrounds. IMG.LY background-removal inference is not used by this version.
+
+Deployment and Testing
+
+1. Back up the currently deployed "index.js".
+2. Compare the update with the current GitHub source to avoid overwriting unrelated changes.
+3. Run "node --check index.js".
+4. Test "/growthcharacter set" with a PNG containing actual transparent pixels.
+5. Confirm that an image with an opaque background is rejected and the existing character remains unchanged.
+6. Confirm that the public success message includes the saved PNG attachment.
+7. Check Render logs for Discord readiness and successful OzVault backups.
+
+No new environment variables or secrets are required.
