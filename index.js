@@ -2103,7 +2103,7 @@ const LAMPOON_FORUM_POSTS = [
     bannerTitle: "TERMS OF SERVICE",
     subtitle: "SERVICE TERMS • USER RESPONSIBILITIES",
     filename: "lampoon-terms-banner.png",
-    body: `These Terms of Service govern the use of the Lampoon Role Manager TikTok integration.\n\n### Use of the Service\nThe integration allows eligible Discord members to connect a TikTok account and use TikTok-related verification, creator recognition, growth and leaderboard features.\n\n### TikTok Authorization\nBy connecting TikTok, you authorize the application to access the TikTok information permitted by the TikTok authorization process.\n\n### Eligibility\nDiscord roles and creator recognition may depend on requirements configured by the Lampoon server. Meeting or failing to meet those requirements may affect role assignment.\n\n### Accurate Information\nUsers should connect their own TikTok account and provide accurate information during the authorization process.\n\n### Service Changes\nThe Lampoon Role Manager functionality may be modified, suspended or discontinued at any time.\n\n### Third-Party Services\nTikTok and Discord are third-party services. Their respective terms and policies also apply when using their platforms.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n[Read the full Terms of Service](${BASE_URL}/terms/)`
+    body: `These Terms of Service govern the use of RoleLogic Manager and its TikTok integration.\n\n### Use of the Service\nThe integration allows eligible Discord members to connect a TikTok account and use TikTok-related verification, creator recognition, growth and leaderboard features.\n\n### TikTok Authorization\nBy connecting TikTok, you authorize the application to access the TikTok information permitted by the TikTok authorization process.\n\n### Eligibility\nDiscord roles and creator recognition may depend on requirements configured by the Lampoon server. Meeting or failing to meet those requirements may affect role assignment.\n\n### Accurate Information\nUsers should connect their own TikTok account and provide accurate information during the authorization process.\n\n### Service Changes\nThe Lampoon Role Manager functionality may be modified, suspended or discontinued at any time.\n\n### Third-Party Services\nTikTok and Discord are third-party services. Their respective terms and policies also apply when using their platforms.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n[Read the full Terms of Service](${BASE_URL}/terms/)`
   },
   {
     key: "privacy",
@@ -2113,7 +2113,7 @@ const LAMPOON_FORUM_POSTS = [
     bannerTitle: "PRIVACY POLICY",
     subtitle: "HOW CONNECTED ACCOUNT DATA IS HANDLED",
     filename: "lampoon-privacy-banner.png",
-    body: `This Privacy Policy explains how Lampoon Role Manager handles information when users connect their TikTok account through the TikTok integration.\n\n### Information We Process\nWhen a user connects TikTok, the application may process information provided through the TikTok API, including TikTok username, display name, profile picture, follower count, following count, likes count, video count, and TikTok profile URL.\n\n### How Information Is Used\nThe information is used to provide TikTok verification, Discord role management, creator recognition, Solo Growth features and leaderboard functionality within the Lampoon Discord server.\n\n### Discord Account Connection\nTikTok information is associated with the Discord account that initiates the TikTok connection process.\n\n### Data Storage\nConnection and statistics information may be stored by the application in order to provide its features and maintain the user's TikTok connection.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n### Third-Party Service\nTikTok authentication and data access are provided through TikTok's official developer platform. TikTok's own privacy policies and terms also apply to the user's use of TikTok.\n\n### Changes to This Policy\nThis Privacy Policy may be updated when the functionality of the TikTok integration changes.\n\n[Read the full Privacy Policy](${BASE_URL}/privacy/)`
+    body: `This Privacy Policy explains how RoleLogic Manager handles information when users connect their TikTok account through the TikTok integration.\n\n### Information We Process\nWhen a user connects TikTok, the application may process information provided through the TikTok API, including TikTok username, display name, profile picture, follower count, following count, likes count, video count, and TikTok profile URL.\n\n### How Information Is Used\nThe information is used to provide TikTok verification, Discord role management, creator recognition, Solo Growth features and leaderboard functionality within the Lampoon Discord server.\n\n### Discord Account Connection\nTikTok information is associated with the Discord account that initiates the TikTok connection process.\n\n### Data Storage\nConnection and statistics information may be stored by the application in order to provide its features and maintain the user's TikTok connection.\n\n### Data Removal\nUsers may request removal of their connected TikTok information through the Lampoon server administration.\n\n### Third-Party Service\nTikTok authentication and data access are provided through TikTok's official developer platform. TikTok's own privacy policies and terms also apply to the user's use of TikTok.\n\n### Changes to This Policy\nThis Privacy Policy may be updated when the functionality of the TikTok integration changes.\n\n[Read the full Privacy Policy](${BASE_URL}/privacy/)`
   }
 ];
 
@@ -2500,7 +2500,7 @@ client.on(
               )
               .setFooter({
                 text:
-                  "Lampoon Role Manager • TikTok Integration",
+                  "RoleLogic Manager • TikTok Integration & Creator Management",
               });
 
           return interaction.reply({
@@ -3542,7 +3542,7 @@ app.get(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy • Lampoon Role Manager</title>
+<title>Privacy Policy | RoleLogic Manager</title>
 
 <style>
 body {
@@ -3552,6 +3552,48 @@ body {
   color: #f5f5f5;
   line-height: 1.7;
 }
+
+
+.site-header {
+  width: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(110deg, #090909, #1b160b, #090909);
+  border-bottom: 1px solid #C48D21;
+  box-shadow: 0 4px 20px rgba(196, 141, 33, 0.12);
+}
+.site-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 15px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.site-brand {
+  color: #F8D85C;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  text-decoration: none;
+}
+.site-label {
+  color: #d7d7d7;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.site-nav { display: flex; gap: 10px; flex-wrap: wrap; }
+.site-nav a {
+  color: #f5f5f5;
+  text-decoration: none;
+  border: 1px solid #51401f;
+  border-radius: 7px;
+  padding: 7px 11px;
+  font-size: 13px;
+}
+.site-nav a:hover { border-color: #F8D85C; color: #F8D85C; }
 
 .container {
   max-width: 900px;
@@ -3588,13 +3630,24 @@ a {
 </head>
 
 <body>
+<header class="site-header">
+  <div class="site-header-inner">
+    <a class="site-brand" href="/" aria-label="RoleLogic Manager home">♛ RoleLogic Manager</a>
+    <span class="site-label">Official Website</span>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/">Home</a>
+      <a href="/terms/">Terms of Service</a>
+      <a href="/privacy/">Privacy Policy</a>
+    </nav>
+  </div>
+</header>
 <div class="container">
 <div class="card">
 
 <h1>Privacy Policy</h1>
 
 <p>
-This Privacy Policy explains how Lampoon Role Manager handles information
+This Privacy Policy explains how RoleLogic Manager handles information
 when users connect their TikTok account through the TikTok integration.
 </p>
 
@@ -3661,7 +3714,7 @@ TikTok integration changes.
 </p>
 
 <p class="footer">
-Lampoon Role Manager<br>
+RoleLogic Manager<br>
 TikTok Integration
 </p>
 
@@ -3722,7 +3775,7 @@ app.get(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Terms of Service • Lampoon Role Manager</title>
+<title>Terms of Service | RoleLogic Manager</title>
 
 <style>
 body {
@@ -3732,6 +3785,48 @@ body {
   color: #f5f5f5;
   line-height: 1.7;
 }
+
+
+.site-header {
+  width: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(110deg, #090909, #1b160b, #090909);
+  border-bottom: 1px solid #C48D21;
+  box-shadow: 0 4px 20px rgba(196, 141, 33, 0.12);
+}
+.site-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 15px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.site-brand {
+  color: #F8D85C;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  text-decoration: none;
+}
+.site-label {
+  color: #d7d7d7;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.site-nav { display: flex; gap: 10px; flex-wrap: wrap; }
+.site-nav a {
+  color: #f5f5f5;
+  text-decoration: none;
+  border: 1px solid #51401f;
+  border-radius: 7px;
+  padding: 7px 11px;
+  font-size: 13px;
+}
+.site-nav a:hover { border-color: #F8D85C; color: #F8D85C; }
 
 .container {
   max-width: 900px;
@@ -3768,13 +3863,24 @@ a {
 </head>
 
 <body>
+<header class="site-header">
+  <div class="site-header-inner">
+    <a class="site-brand" href="/" aria-label="RoleLogic Manager home">♛ RoleLogic Manager</a>
+    <span class="site-label">Official Website</span>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/">Home</a>
+      <a href="/terms/">Terms of Service</a>
+      <a href="/privacy/">Privacy Policy</a>
+    </nav>
+  </div>
+</header>
 <div class="container">
 <div class="card">
 
 <h1>Terms of Service</h1>
 
 <p>
-These Terms of Service govern the use of the Lampoon Role Manager
+These Terms of Service govern the use of RoleLogic Manager and its
 TikTok integration.
 </p>
 
@@ -3830,7 +3936,7 @@ through the Lampoon server administration.
 </p>
 
 <p class="footer">
-Lampoon Role Manager<br>
+RoleLogic Manager<br>
 TikTok Integration
 </p>
 
@@ -3968,7 +4074,7 @@ app.get(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lampoon Role Manager</title>
+<title>RoleLogic Manager | TikTok Integration & Creator Management</title>
 
 <style>
 body {
@@ -3977,6 +4083,48 @@ body {
   background: #080808;
   color: #f5f5f5;
 }
+
+
+.site-header {
+  width: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(110deg, #090909, #1b160b, #090909);
+  border-bottom: 1px solid #C48D21;
+  box-shadow: 0 4px 20px rgba(196, 141, 33, 0.12);
+}
+.site-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 15px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.site-brand {
+  color: #F8D85C;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  text-decoration: none;
+}
+.site-label {
+  color: #d7d7d7;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.site-nav { display: flex; gap: 10px; flex-wrap: wrap; }
+.site-nav a {
+  color: #f5f5f5;
+  text-decoration: none;
+  border: 1px solid #51401f;
+  border-radius: 7px;
+  padding: 7px 11px;
+  font-size: 13px;
+}
+.site-nav a:hover { border-color: #F8D85C; color: #F8D85C; }
 
 .container {
   max-width: 900px;
@@ -4044,11 +4192,23 @@ h2 {
 
 <body>
 
+<header class="site-header">
+  <div class="site-header-inner">
+    <a class="site-brand" href="/" aria-label="RoleLogic Manager home">♛ RoleLogic Manager</a>
+    <span class="site-label">Official Website</span>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/">Home</a>
+      <a href="/terms/">Terms of Service</a>
+      <a href="/privacy/">Privacy Policy</a>
+    </nav>
+  </div>
+</header>
+
 <div class="container">
 
 <div class="hero">
 
-<h1>🎭 Lampoon Role Manager</h1>
+<h1>RoleLogic Manager</h1>
 
 <p class="subtitle">
 TikTok Integration & Creator Management
@@ -4073,7 +4233,7 @@ Terms of Service
 <h2>TikTok Integration</h2>
 
 <p>
-Lampoon Role Manager connects eligible TikTok creators with
+RoleLogic Manager connects eligible TikTok creators with
 the Lampoon Discord community.
 </p>
 
@@ -4099,7 +4259,7 @@ management, growth tracking and leaderboard features.
 </div>
 
 <div class="footer">
-Lampoon Role Manager • TikTok Integration
+RoleLogic Manager • TikTok Integration & Creator Management
 </div>
 
 </div>
